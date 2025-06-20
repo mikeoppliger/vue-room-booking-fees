@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
+import { useDiscountStore } from './discountStore'
 
 // Load data from localStorage
 const loadStoredData = () => {
@@ -52,8 +53,15 @@ export const useFeeStore = defineStore('fees', () => {
   // Neue Gebühr hinzufügen
   function addFee(fee) {
     const newFee = {
-      ...fee,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      name: fee.name,
+      amount: fee.amount,
+      cycle: fee.cycle,
+      startDate: fee.startDate,
+      endDate: fee.endDate,
+      roomIds: fee.roomIds || [],
+      userGroupIds: fee.userGroupIds || [],
+      createdAt: new Date().toISOString()
     }
     fees.value.push(newFee)
     logChange('create', newFee)
@@ -65,9 +73,13 @@ export const useFeeStore = defineStore('fees', () => {
     const index = fees.value.findIndex(f => f.id === updatedFee.id)
     if (index !== -1) {
       const oldFee = { ...fees.value[index] }
-      fees.value[index] = updatedFee
-      logChange('update', updatedFee, oldFee)
-      return updatedFee
+      fees.value[index] = {
+        ...oldFee,
+        ...updatedFee,
+        updatedAt: new Date().toISOString()
+      }
+      logChange('update', fees.value[index], oldFee)
+      return fees.value[index]
     }
     return null
   }
@@ -101,11 +113,10 @@ export const useFeeStore = defineStore('fees', () => {
         cycle: 'Zyklus',
         startDate: 'Startdatum',
         endDate: 'Enddatum',
-        userGroupIds: 'Benutzergruppen',
-        roomIds: 'Räume'
+        roomIds: 'Räume',
+        userGroupIds: 'Benutzergruppen'
       }
 
-      // Grundlegende Felder vergleichen
       Object.entries(compareFields).forEach(([field]) => {
         const oldValue = oldFee[field]
         const newValue = newFee[field]
@@ -117,30 +128,9 @@ export const useFeeStore = defineStore('fees', () => {
           }
         }
       })
-
-      // Rabatte vergleichen
-      const discountTypes = ['weekday', 'earlyBird', 'duration', 'seasonal']
-
-      discountTypes.forEach(type => {
-        const oldDiscount = oldFee.discounts?.[type]
-        const newDiscount = newFee.discounts?.[type]
-        
-        if (JSON.stringify(oldDiscount) !== JSON.stringify(newDiscount)) {
-          change.changes[`discounts.${type}`] = {
-            old: oldDiscount,
-            new: newDiscount
-          }
-        }
-      })
-
-      // Only add to history if there are actual changes
-      if (Object.keys(change.changes).length > 0) {
-        feeHistory.value.unshift(change)
-      }
-    } else {
-      // For create and delete, always add to history
-      feeHistory.value.unshift(change)
     }
+
+    feeHistory.value.unshift(change)
   }
 
   // Endgültigen Gebührenbetrag mit allen anwendbaren Rabatten berechnen
@@ -148,40 +138,59 @@ export const useFeeStore = defineStore('fees', () => {
     const fee = fees.value.find(f => f.id === feeId)
     if (!fee) return null
 
-    let baseAmount = fee.amount
+    const discountStore = useDiscountStore()
+    const feeDiscounts = discountStore.getDiscountsForFee(feeId)
+    let finalAmount = fee.amount
 
-    // Wochentagsrabatt anwenden, falls zutreffend
-    const bookingDay = new Date(bookingData.startDate).getDay()
-    const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const weekdayDiscount = fee.discounts?.weekday?.[weekdays[bookingDay]] || 0
-    
-    // Frühbucherrabatt anwenden, falls zutreffend
-    const daysInAdvance = Math.floor((new Date(bookingData.startDate) - new Date()) / (1000 * 60 * 60 * 24))
-    const earlyBirdDiscount = daysInAdvance >= (fee.discounts?.earlyBird?.minDays || 0) ? 
-      (fee.discounts?.earlyBird?.percentage || 0) : 0
+    // Apply all discounts
+    feeDiscounts.forEach(discount => {
+      const { type, settings } = discount
+      
+      switch (type) {
+        case 'weekday': {
+          const bookingDay = new Date(bookingData.startDate).getDay()
+          const weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][bookingDay]
+          const percentage = settings.weekdays?.[weekday] || 0
+          finalAmount *= (1 - percentage / 100)
+          break
+        }
+        case 'earlyBird': {
+          const daysInAdvance = Math.floor((new Date(bookingData.startDate) - new Date()) / (1000 * 60 * 60 * 24))
+          if (daysInAdvance >= settings.minDays) {
+            finalAmount *= (1 - settings.percentage / 100)
+          }
+          break
+        }
+        case 'duration': {
+          const bookingDuration = Math.ceil((new Date(bookingData.endDate) - new Date(bookingData.startDate)) / (1000 * 60 * 60 * 24))
+          const applicableRule = settings.rules
+            ?.filter(rule => bookingDuration >= rule.minDays)
+            .reduce((max, rule) => rule.percentage > max.percentage ? rule : max, { percentage: 0 })
+          
+          if (applicableRule) {
+            finalAmount *= (1 - applicableRule.percentage / 100)
+          }
+          break
+        }
+        case 'seasonal': {
+          const bookingDate = new Date(bookingData.startDate)
+          const applicableRule = settings.rules
+            ?.filter(rule => {
+              const start = new Date(rule.startDate)
+              const end = new Date(rule.endDate)
+              return bookingDate >= start && bookingDate <= end
+            })
+            .reduce((max, rule) => rule.percentage > max.percentage ? rule : max, { percentage: 0 })
+          
+          if (applicableRule) {
+            finalAmount *= (1 - applicableRule.percentage / 100)
+          }
+          break
+        }
+      }
+    })
 
-    // Dauerrabatt anwenden, falls zutreffend
-    const bookingDuration = Math.ceil((new Date(bookingData.endDate) - new Date(bookingData.startDate)) / (1000 * 60 * 60 * 24))
-    const durationDiscount = (fee.discounts?.duration || [])
-      .filter(rule => bookingDuration >= rule.minDays)
-      .reduce((max, rule) => Math.max(max, rule.percentage), 0)
-
-    // Saisonrabatt anwenden, falls zutreffend
-    const seasonalDiscount = (fee.discounts?.seasonal || [])
-      .filter(rule => {
-        const bookingStart = new Date(bookingData.startDate)
-        const ruleStart = new Date(rule.startDate)
-        const ruleEnd = new Date(rule.endDate)
-        return bookingStart >= ruleStart && bookingStart <= ruleEnd
-      })
-      .reduce((max, rule) => Math.max(max, rule.percentage), 0)
-
-    // Gesamtrabatt berechnen (multiplikative Stapelung)
-    const totalDiscount = [weekdayDiscount, earlyBirdDiscount, durationDiscount, seasonalDiscount]
-      .filter(d => d > 0)
-      .reduce((total, discount) => total * (1 - discount/100), 1)
-
-    return baseAmount * totalDiscount
+    return finalAmount
   }
 
   // Gebühren nach Raum abrufen
@@ -203,14 +212,6 @@ export const useFeeStore = defineStore('fees', () => {
     return startDate <= now && (!endDate || endDate >= now)
   })
 
-  // Store zurücksetzen
-  function resetStore() {
-    fees.value = []
-    feeHistory.value = []
-    localStorage.removeItem('fees')
-    localStorage.removeItem('feeHistory')
-  }
-
   return {
     fees,
     feeHistory,
@@ -221,7 +222,6 @@ export const useFeeStore = defineStore('fees', () => {
     calculateFee,
     getFeesByRoom,
     getFeesByUserGroup,
-    isFeeCurrent,
-    resetStore
+    isFeeCurrent
   }
 })

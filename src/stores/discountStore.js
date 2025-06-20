@@ -1,157 +1,132 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+
+const loadStoredData = () => {
+  try {
+    const storedDiscounts = localStorage.getItem('discounts')
+    const storedFeeDiscounts = localStorage.getItem('feeDiscounts')
+    
+    return {
+      discounts: storedDiscounts ? JSON.parse(storedDiscounts) : [],
+      feeDiscounts: storedFeeDiscounts ? JSON.parse(storedFeeDiscounts) : []
+    }
+  } catch (error) {
+    console.error('Error loading stored discount data:', error)
+    return {
+      discounts: [],
+      feeDiscounts: []
+    }
+  }
+}
+
+const storedData = loadStoredData()
 
 export const useDiscountStore = defineStore('discounts', () => {
-  const discountTypes = ref([
-    { id: 'weekday', name: 'Weekday Discount', description: 'Apply different discounts for each day of the week' },
-    { id: 'early_bird', name: 'Early Bird', description: 'Discount for bookings made in advance' },
-    { id: 'duration', name: 'Duration Discount', description: 'Discount based on booking duration' },
-    { id: 'volume', name: 'Volume Discount', description: 'Discount based on number of rooms booked' },
-    { id: 'seasonal', name: 'Seasonal Discount', description: 'Discount for specific date ranges' },
-    { id: 'user_group', name: 'User Group Discount', description: 'Additional discount for specific user groups' }
-  ])
+  const discounts = ref(storedData.discounts)
+  const feeDiscounts = ref(storedData.feeDiscounts) // Relation table between fees and discounts
 
-  const discountRules = ref([])
+  // Watch for changes and save to localStorage
+  watch(
+    [discounts, feeDiscounts],
+    ([newDiscounts, newFeeDiscounts]) => {
+      localStorage.setItem('discounts', JSON.stringify(newDiscounts))
+      localStorage.setItem('feeDiscounts', JSON.stringify(newFeeDiscounts))
+    },
+    { deep: true }
+  )
 
-  const addDiscountRule = (rule) => {
-    discountRules.value.push({
-      id: Date.now(),
-      ...rule,
+  // Add new discount
+  function addDiscount(discount) {
+    const newDiscount = {
+      id: Date.now().toString(),
+      ...discount,
       createdAt: new Date().toISOString()
-    })
+    }
+    discounts.value.push(newDiscount)
+    return newDiscount
   }
 
-  const updateDiscountRule = (id, updates) => {
-    const index = discountRules.value.findIndex(r => r.id === id)
+  // Update existing discount
+  function updateDiscount(id, updatedDiscount) {
+    const index = discounts.value.findIndex(d => d.id === id)
     if (index !== -1) {
-      discountRules.value[index] = { ...discountRules.value[index], ...updates }
+      discounts.value[index] = {
+        ...discounts.value[index],
+        ...updatedDiscount,
+        updatedAt: new Date().toISOString()
+      }
+      return discounts.value[index]
     }
+    return null
   }
 
-  const deleteDiscountRule = (id) => {
-    discountRules.value = discountRules.value.filter(r => r.id !== id)
+  // Delete discount
+  function deleteDiscount(id) {
+    discounts.value = discounts.value.filter(d => d.id !== id)
+    // Also remove all fee-discount relations for this discount
+    feeDiscounts.value = feeDiscounts.value.filter(fd => fd.discountId !== id)
   }
 
-  const calculateDiscount = (fee, booking) => {
-    let finalPrice = fee.amount
-    let appliedDiscounts = []
+  // Associate discount with fee
+  function addDiscountToFee(feeId, discountId, settings = {}) {
+    const relation = {
+      id: Date.now().toString(),
+      feeId,
+      discountId,
+      settings, // For specific discount settings like percentage, minDays, etc.
+      createdAt: new Date().toISOString()
+    }
+    feeDiscounts.value.push(relation)
+    return relation
+  }
 
-    // Get applicable rules for this fee
-    const applicableRules = discountRules.value.filter(rule => 
-      rule.feeIds.includes(fee.id) && isRuleValid(rule, booking)
+  // Remove discount from fee
+  function removeDiscountFromFee(feeId, discountId) {
+    feeDiscounts.value = feeDiscounts.value.filter(
+      fd => !(fd.feeId === feeId && fd.discountId === discountId)
     )
+  }
 
-    for (const rule of applicableRules) {
-      const discount = calculateRuleDiscount(rule, fee, booking)
-      if (discount > 0) {
-        finalPrice = applyDiscount(finalPrice, discount, rule.stackingType)
-        appliedDiscounts.push({
-          ruleName: rule.name,
-          amount: discount,
-          type: rule.type
-        })
+  // Get all discounts for a fee
+  const getDiscountsForFee = computed(() => (feeId) => {
+    const relations = feeDiscounts.value.filter(fd => fd.feeId === feeId)
+    return relations.map(relation => ({
+      ...discounts.value.find(d => d.id === relation.discountId),
+      settings: relation.settings
+    }))
+  })
+
+  // Get all fees for a discount
+  const getFeesForDiscount = computed(() => (discountId) => {
+    return feeDiscounts.value
+      .filter(fd => fd.discountId === discountId)
+      .map(fd => fd.feeId)
+  })
+
+  // Update discount settings for a fee
+  function updateDiscountSettings(feeId, discountId, settings) {
+    const relation = feeDiscounts.value.find(
+      fd => fd.feeId === feeId && fd.discountId === discountId
+    )
+    if (relation) {
+      relation.settings = {
+        ...relation.settings,
+        ...settings
       }
+      relation.updatedAt = new Date().toISOString()
     }
-
-    return {
-      originalPrice: fee.amount,
-      finalPrice,
-      appliedDiscounts,
-      totalDiscount: fee.amount - finalPrice
-    }
-  }
-
-  const isRuleValid = (rule, booking) => {
-    if (!booking) return false
-
-    switch (rule.type) {
-      case 'weekday':
-        const bookingDay = new Date(booking.startDate).getDay()
-        return rule.conditions.days.includes(bookingDay)
-      
-      case 'early_bird':
-        const daysUntilBooking = getDaysDifference(new Date(), new Date(booking.startDate))
-        return daysUntilBooking >= rule.conditions.minDays
-      
-      case 'duration':
-        const bookingDuration = getDaysDifference(
-          new Date(booking.startDate),
-          new Date(booking.endDate)
-        )
-        return bookingDuration >= rule.conditions.minDays
-      
-      case 'volume':
-        return booking.roomIds.length >= rule.conditions.minRooms
-      
-      case 'seasonal':
-        const bookingDate = new Date(booking.startDate)
-        return isDateInRange(bookingDate, rule.conditions.startDate, rule.conditions.endDate)
-      
-      case 'user_group':
-        return rule.conditions.userGroupIds.includes(booking.userGroupId)
-      
-      default:
-        return false
-    }
-  }
-
-  const calculateRuleDiscount = (rule, fee, booking) => {
-    switch (rule.type) {
-      case 'weekday':
-        return (rule.discountPercent / 100) * fee.amount
-      
-      case 'early_bird': {
-        const daysUntilBooking = getDaysDifference(new Date(), new Date(booking.startDate))
-        const maxDiscount = (rule.conditions.maxDiscountPercent / 100) * fee.amount
-        const dailyDiscount = (rule.discountPercent / 100) * fee.amount / rule.conditions.minDays
-        return Math.min(maxDiscount, dailyDiscount * daysUntilBooking)
-      }
-      
-      case 'duration': {
-        const duration = getDaysDifference(
-          new Date(booking.startDate),
-          new Date(booking.endDate)
-        )
-        return (rule.discountPercent / 100) * fee.amount * duration
-      }
-      
-      case 'volume':
-        return (rule.discountPercent / 100) * fee.amount * booking.roomIds.length
-      
-      case 'seasonal':
-        return (rule.discountPercent / 100) * fee.amount
-      
-      case 'user_group':
-        return (rule.discountPercent / 100) * fee.amount
-      
-      default:
-        return 0
-    }
-  }
-
-  const applyDiscount = (price, discount, stackingType = 'multiplicative') => {
-    if (stackingType === 'additive') {
-      return price - discount
-    } else {
-      // Multiplicative stacking (compound discounts)
-      return price * (1 - discount / price)
-    }
-  }
-
-  const getDaysDifference = (date1, date2) => {
-    return Math.ceil(Math.abs(date2 - date1) / (1000 * 60 * 60 * 24))
-  }
-
-  const isDateInRange = (date, start, end) => {
-    return date >= new Date(start) && date <= new Date(end)
   }
 
   return {
-    discountTypes,
-    discountRules,
-    addDiscountRule,
-    updateDiscountRule,
-    deleteDiscountRule,
-    calculateDiscount
+    discounts,
+    feeDiscounts,
+    addDiscount,
+    updateDiscount,
+    deleteDiscount,
+    addDiscountToFee,
+    removeDiscountFromFee,
+    getDiscountsForFee,
+    getFeesForDiscount,
+    updateDiscountSettings
   }
 })
