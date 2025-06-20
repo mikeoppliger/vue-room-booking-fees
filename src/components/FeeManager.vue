@@ -44,6 +44,7 @@
             </template>
 
             <template v-slot:item.discounts="{ item }">
+              
               <v-chip
                 v-if="hasDiscounts(item)"
                 color="success"
@@ -166,16 +167,19 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useFeeStore } from '../stores/feeStore'
+import { useDiscountStore } from '../stores/discountStore'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const feeStore = useFeeStore()
+const discountStore = useDiscountStore()
 const search = ref('')
 const showDeleteDialog = ref(false)
 const showSuccessAlert = ref(false)
 const successMessage = ref('')
 const showErrorAlert = ref(false)
 const errorMessage = ref('')
+const selectedFeeId = ref(null)
 
 const weekDays = [
   { value: 'monday', label: 'Montag' },
@@ -195,6 +199,7 @@ const headers = [
   { title: 'Zyklus', key: 'cycle', sortable: true },
   { title: 'Rabatte', key: 'discounts', sortable: false },
   { title: 'Benutzergruppen', key: 'userGroups', sortable: false },
+  { title: 'Status', key: 'status', sortable: true },
   { title: 'Startdatum', key: 'startDate', sortable: true },
   { title: 'Enddatum', key: 'endDate', sortable: true },
   { title: 'Aktionen', key: 'actions', sortable: false }
@@ -211,15 +216,15 @@ function editFee(fee) {
 }
 
 function confirmDelete(fee) {
-  feeStore.editingFee = fee.id
+  selectedFeeId.value = fee.id
   showDeleteDialog.value = true
 }
 
 function deleteFee() {
-  if (feeStore.editingFee) {
-    feeStore.deleteFee(feeStore.editingFee)
+  if (selectedFeeId.value) {
+    feeStore.deleteFee(selectedFeeId.value)
     showDeleteDialog.value = false
-    feeStore.editingFee = null
+    selectedFeeId.value = null
   }
 }
 
@@ -227,32 +232,36 @@ function formatAmount(amount) {
   return new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency: 'EUR'
-  }).format(amount)
+  }).format(amount || 0)
 }
 
 function hasDiscounts(fee) {
-  const d = fee.discounts
-  return Object.values(d.weekday).some(v => v > 0) ||
-         d.earlyBird.percentage > 0 ||
-         d.duration.length > 0 ||
-         d.seasonal.length > 0
+  if (!fee?.id) return false
+  const discounts = discountStore.getDiscountsForFee(fee.id)
+  return discounts && discounts.length > 0
 }
 
 function getDiscountSummary(fee) {
-  let types = []
-  const d = fee.discounts
+  if (!fee?.id) return ''
+  const discounts = discountStore.getDiscountsForFee(fee.id)
+  if (!discounts?.length) return ''
 
-  if (Object.values(d.weekday).some(v => v > 0)) types.push('Wochentage')
-  if (d.earlyBird.percentage > 0) types.push('Frühbucher')
-  if (d.duration.length > 0) types.push('Dauer')
-  if (d.seasonal.length > 0) types.push('Saisonal')
-
-  return `${types.length} Typen`
+  const types = new Set(discounts.map(d => d.type))
+  return `${types.size} ${types.size === 1 ? 'Typ' : 'Typen'}`
 }
 
 function getUserGroupName(groupId) {
   const group = userGroups.value.find(g => g.id === groupId)
   return group ? group.name : 'Unbekannt'
+}
+
+function isFeeCurrent(fee) {
+  if (!fee) return false
+  const now = new Date()
+  const startDate = fee.startDate ? new Date(fee.startDate) : null
+  const endDate = fee.endDate ? new Date(fee.endDate) : null
+  
+  return (!startDate || startDate <= now) && (!endDate || endDate >= now)
 }
 </script>
 

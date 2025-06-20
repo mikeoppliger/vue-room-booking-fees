@@ -1,119 +1,143 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-
-const loadStoredData = () => {
-  try {
-    const storedDiscounts = localStorage.getItem('discounts')
-    const storedFeeDiscounts = localStorage.getItem('feeDiscounts')
-    
-    return {
-      discounts: storedDiscounts ? JSON.parse(storedDiscounts) : [],
-      feeDiscounts: storedFeeDiscounts ? JSON.parse(storedFeeDiscounts) : []
-    }
-  } catch (error) {
-    console.error('Error loading stored discount data:', error)
-    return {
-      discounts: [],
-      feeDiscounts: []
-    }
-  }
-}
-
-const storedData = loadStoredData()
+import { ref, computed } from 'vue'
 
 export const useDiscountStore = defineStore('discounts', () => {
-  const discounts = ref(storedData.discounts)
-  const feeDiscounts = ref(storedData.feeDiscounts) // Relation table between fees and discounts
+  const discounts = ref([])
+  const feeDiscounts = ref([]) // Tracks which discounts are applied to which fees
 
-  // Watch for changes and save to localStorage
-  watch(
-    [discounts, feeDiscounts],
-    ([newDiscounts, newFeeDiscounts]) => {
-      localStorage.setItem('discounts', JSON.stringify(newDiscounts))
-      localStorage.setItem('feeDiscounts', JSON.stringify(newFeeDiscounts))
-    },
-    { deep: true }
-  )
+  // Load data from localStorage on initialization
+  const loadFromStorage = () => {
+    const storedDiscounts = localStorage.getItem('discounts')
+    if (storedDiscounts) {
+      discounts.value = JSON.parse(storedDiscounts)
+    }
+    const storedFeeDiscounts = localStorage.getItem('feeDiscounts')
+    if (storedFeeDiscounts) {
+      feeDiscounts.value = JSON.parse(storedFeeDiscounts)
+    }
+  }
 
-  // Add new discount
-  function addDiscount(discount) {
+  // Save data to localStorage
+  const saveToStorage = () => {
+    localStorage.setItem('discounts', JSON.stringify(discounts.value))
+    localStorage.setItem('feeDiscounts', JSON.stringify(feeDiscounts.value))
+  }
+
+  // Initialize data
+  loadFromStorage()
+
+  const addDiscount = (discount) => {
     const newDiscount = {
-      id: Date.now().toString(),
       ...discount,
-      createdAt: new Date().toISOString()
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      settings: JSON.stringify(discount.settings || getDefaultSettings(discount.type))
     }
     discounts.value.push(newDiscount)
+    saveToStorage()
     return newDiscount
   }
 
-  // Update existing discount
-  function updateDiscount(id, updatedDiscount) {
+  const updateDiscount = (discount) => {
+    const index = discounts.value.findIndex(d => d.id === discount.id)
+    if (index === -1) return null
+
+    const updatedDiscount = {
+      ...discounts.value[index],
+      ...discount,
+      updatedAt: new Date().toISOString(),
+      settings: JSON.stringify(discount.settings || JSON.parse(discounts.value[index].settings))
+    }
+    
+    discounts.value[index] = updatedDiscount
+    saveToStorage()
+    return updatedDiscount
+  }
+
+  const deleteDiscount = (id) => {
     const index = discounts.value.findIndex(d => d.id === id)
-    if (index !== -1) {
-      discounts.value[index] = {
-        ...discounts.value[index],
-        ...updatedDiscount,
-        updatedAt: new Date().toISOString()
-      }
-      return discounts.value[index]
-    }
-    return null
-  }
+    if (index === -1) return false
 
-  // Delete discount
-  function deleteDiscount(id) {
-    discounts.value = discounts.value.filter(d => d.id !== id)
-    // Also remove all fee-discount relations for this discount
+    discounts.value.splice(index, 1)
+    // Also remove any fee-discount associations
     feeDiscounts.value = feeDiscounts.value.filter(fd => fd.discountId !== id)
+    saveToStorage()
+    return true
   }
 
-  // Associate discount with fee
-  function addDiscountToFee(feeId, discountId, settings = {}) {
-    const relation = {
-      id: Date.now().toString(),
-      feeId,
-      discountId,
-      settings, // For specific discount settings like percentage, minDays, etc.
-      createdAt: new Date().toISOString()
+  const getDiscountById = (id) => {
+    return discounts.value.find(d => d.id === id) || null
+  }
+
+  const associateDiscountWithFee = (feeId, discountId) => {
+    if (!feeDiscounts.value.some(fd => fd.feeId === feeId && fd.discountId === discountId)) {
+      feeDiscounts.value.push({ feeId, discountId })
+      saveToStorage()
     }
-    feeDiscounts.value.push(relation)
-    return relation
   }
 
-  // Remove discount from fee
-  function removeDiscountFromFee(feeId, discountId) {
+  const removeDiscountFromFee = (feeId, discountId) => {
     feeDiscounts.value = feeDiscounts.value.filter(
       fd => !(fd.feeId === feeId && fd.discountId === discountId)
     )
+    saveToStorage()
   }
 
-  // Get all discounts for a fee
   const getDiscountsForFee = computed(() => (feeId) => {
-    const relations = feeDiscounts.value.filter(fd => fd.feeId === feeId)
-    return relations.map(relation => ({
-      ...discounts.value.find(d => d.id === relation.discountId),
-      settings: relation.settings
-    }))
+    const discountIds = feeDiscounts.value
+      .filter(fd => fd.feeId === feeId)
+      .map(fd => fd.discountId)
+    return discounts.value.filter(d => discountIds.includes(d.id))
   })
 
-  // Get all fees for a discount
   const getFeesForDiscount = computed(() => (discountId) => {
     return feeDiscounts.value
       .filter(fd => fd.discountId === discountId)
       .map(fd => fd.feeId)
   })
 
-  // Update discount settings for a fee
-  function updateDiscountSettings(feeId, discountId, settings) {
+  const getDefaultSettings = (type) => {
+    switch (type) {
+      case 'percentage':
+        return { percentage: 0 }
+      case 'fixed':
+        return { amount: 0 }
+      case 'weekday':
+        return {
+          monday: 0,
+          tuesday: 0,
+          wednesday: 0,
+          thursday: 0,
+          friday: 0,
+          saturday: 0,
+          sunday: 0
+        }
+      case 'earlyBird':
+        return {
+          minDays: 7,
+          percentage: 0
+        }
+      case 'duration':
+        return {
+          rules: []
+        }
+      case 'seasonal':
+        return {
+          rules: []
+        }
+      default:
+        return {}
+    }
+  }
+
+  const updateDiscountSettings = (feeId, discountId, settings) => {
     const relation = feeDiscounts.value.find(
       fd => fd.feeId === feeId && fd.discountId === discountId
     )
     if (relation) {
-      relation.settings = {
-        ...relation.settings,
-        ...settings
-      }
-      relation.updatedAt = new Date().toISOString()
+      relation.settings = JSON.stringify(settings)
+      saveToStorage()
     }
   }
 
@@ -123,10 +147,12 @@ export const useDiscountStore = defineStore('discounts', () => {
     addDiscount,
     updateDiscount,
     deleteDiscount,
-    addDiscountToFee,
+    getDiscountById,
+    associateDiscountWithFee,
     removeDiscountFromFee,
     getDiscountsForFee,
     getFeesForDiscount,
+    getDefaultSettings,
     updateDiscountSettings
   }
 })

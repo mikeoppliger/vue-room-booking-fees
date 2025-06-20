@@ -1,227 +1,194 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import { useDiscountStore } from './discountStore'
-
-// Load data from localStorage
-const loadStoredData = () => {
-  try {
-    const storedFees = localStorage.getItem('fees')
-    const storedHistory = localStorage.getItem('feeHistory')
-    const storedGroups = localStorage.getItem('userGroups')
-    
-    return {
-      fees: storedFees ? JSON.parse(storedFees) : [],
-      feeHistory: storedHistory ? JSON.parse(storedHistory) : [],
-      userGroups: storedGroups ? JSON.parse(storedGroups) : [
-        { id: 1, name: 'Standardnutzer' },
-        { id: 2, name: 'Premium-Nutzer' },
-        { id: 3, name: 'Geschäftskunden' }
-      ]
-    }
-  } catch (error) {
-    console.error('Error loading stored data:', error)
-    return {
-      fees: [],
-      feeHistory: [],
-      userGroups: [
-        { id: 1, name: 'Standardnutzer' },
-        { id: 2, name: 'Premium-Nutzer' },
-        { id: 3, name: 'Geschäftskunden' }
-      ]
-    }
-  }
-}
-
-const storedData = loadStoredData()
+import { ref, computed } from 'vue'
 
 export const useFeeStore = defineStore('fees', () => {
-  const fees = ref(storedData.fees)
-  const feeHistory = ref(storedData.feeHistory)
-  const userGroups = ref(storedData.userGroups)
+  const fees = ref([])
+  const editingFee = ref(null)
+  const userGroups = ref([
+    { id: 1, name: 'Standardnutzer' },
+    { id: 2, name: 'Premium-Nutzer' },
+    { id: 3, name: 'Geschäftskunden' }
+  ])
 
-  // Watch for changes and save to localStorage
-  watch(
-    [fees, feeHistory, userGroups],
-    ([newFees, newHistory, newGroups]) => {
-      localStorage.setItem('fees', JSON.stringify(newFees))
-      localStorage.setItem('feeHistory', JSON.stringify(newHistory))
-      localStorage.setItem('userGroups', JSON.stringify(newGroups))
-    },
-    { deep: true }
-  )
-
-  // Neue Gebühr hinzufügen
-  function addFee(fee) {
-    const newFee = {
-      id: Date.now().toString(),
-      name: fee.name,
-      amount: fee.amount,
-      cycle: fee.cycle,
-      startDate: fee.startDate,
-      endDate: fee.endDate,
-      roomIds: fee.roomIds || [],
-      userGroupIds: fee.userGroupIds || [],
-      createdAt: new Date().toISOString()
+  // Load data from localStorage on initialization
+  const loadFromStorage = () => {
+    const storedFees = localStorage.getItem('fees')
+    if (storedFees) {
+      fees.value = JSON.parse(storedFees)
     }
-    fees.value.push(newFee)
-    logChange('create', newFee)
-    return newFee
   }
 
-  // Bestehende Gebühr aktualisieren
-  function updateFee(updatedFee) {
-    const index = fees.value.findIndex(f => f.id === updatedFee.id)
-    if (index !== -1) {
-      const oldFee = { ...fees.value[index] }
-      fees.value[index] = {
-        ...oldFee,
-        ...updatedFee,
+  // Save data to localStorage
+  const saveToStorage = () => {
+    localStorage.setItem('fees', JSON.stringify(fees.value))
+  }
+
+  // Initialize data
+  loadFromStorage()
+
+  // Load initial data
+  async function loadFees() {
+    // No need to load from database, data is already loaded from localStorage
+  }
+
+  // Add a new fee
+  async function addFee(feeData) {
+    try {
+      const newFee = {
+        ...feeData,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
-      logChange('update', fees.value[index], oldFee)
-      return fees.value[index]
+      fees.value.push(newFee)
+      saveToStorage()
+      return newFee
+    } catch (error) {
+      console.error('Failed to create fee:', error)
+      throw error
     }
-    return null
   }
 
-  // Gebühr löschen
-  function deleteFee(id) {
-    const feeToDelete = fees.value.find(f => f.id === id)
-    if (feeToDelete) {
-      fees.value = fees.value.filter(f => f.id !== id)
-      logChange('delete', { ...feeToDelete })
-      return true
-    }
-    return false
-  }
+  // Update an existing fee
+  async function updateFee(feeData) {
+    try {
+      const index = fees.value.findIndex(f => f.id === feeData.id)
+      if (index === -1) return null
 
-  // Änderungen protokollieren
-  function logChange(action, newFee, oldFee = null) {
-    const change = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      type: action,
-      feeId: newFee.id,
-      description: `${newFee.name} wurde ${action === 'create' ? 'erstellt' : action === 'update' ? 'aktualisiert' : 'gelöscht'}`,
-      changes: {}
-    }
-
-    if (action === 'update' && oldFee) {
-      const compareFields = {
-        name: 'Name',
-        amount: 'Betrag',
-        cycle: 'Zyklus',
-        startDate: 'Startdatum',
-        endDate: 'Enddatum',
-        roomIds: 'Räume',
-        userGroupIds: 'Benutzergruppen'
+      const updatedFee = {
+        ...fees.value[index],
+        ...feeData,
+        updatedAt: new Date().toISOString()
       }
+      
+      fees.value[index] = updatedFee
+      saveToStorage()
+      return updatedFee
+    } catch (error) {
+      console.error('Failed to update fee:', error)
+      throw error
+    }
+  }
 
-      Object.entries(compareFields).forEach(([field]) => {
-        const oldValue = oldFee[field]
-        const newValue = newFee[field]
-        
-        if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
-          change.changes[field] = {
-            old: oldValue,
-            new: newValue
-          }
+  // Delete a fee
+  async function deleteFee(id) {
+    try {
+      const index = fees.value.findIndex(f => f.id === id)
+      if (index === -1) return false
+
+      fees.value.splice(index, 1)
+      saveToStorage()
+      return true
+    } catch (error) {
+      console.error('Failed to delete fee:', error)
+      throw error
+    }
+  }
+
+  // Get a specific fee
+  async function getFee(id) {
+    try {
+      const fee = fees.value.find(f => f.id === id)
+      if (fee) {
+        editingFee.value = fee
+      }
+      return fee
+    } catch (error) {
+      console.error('Failed to get fee:', error)
+      throw error
+    }
+  }
+
+  // Calculate fee with discounts
+  function calculateFee(fee, options = {}) {
+    if (!fee) return 0
+
+    let amount = fee.amount
+    const { userGroupId, date = new Date() } = options
+
+    // Apply discounts if any
+    if (fee.discounts) {
+      fee.discounts.forEach(discount => {
+        const settings = typeof discount.settings === 'string' 
+          ? JSON.parse(discount.settings) 
+          : discount.settings
+
+        switch (discount.type) {
+          case 'percentage':
+            amount -= (amount * (settings.percentage / 100))
+            break
+          case 'fixed':
+            amount -= settings.amount
+            break
+          case 'weekday':
+            const day = date.toLocaleLowerCase().slice(0, 3)
+            if (settings[day]) {
+              amount -= (amount * (settings[day] / 100))
+            }
+            break
+          case 'earlyBird':
+            // Early bird logic
+            break
+          case 'duration':
+            // Duration based discount logic
+            break
+          case 'seasonal':
+            // Seasonal discount logic
+            break
         }
       })
     }
 
-    feeHistory.value.unshift(change)
-  }
-
-  // Endgültigen Gebührenbetrag mit allen anwendbaren Rabatten berechnen
-  function calculateFee(feeId, bookingData) {
-    const fee = fees.value.find(f => f.id === feeId)
-    if (!fee) return null
-
-    const discountStore = useDiscountStore()
-    const feeDiscounts = discountStore.getDiscountsForFee(feeId)
-    let finalAmount = fee.amount
-
-    // Apply all discounts
-    feeDiscounts.forEach(discount => {
-      const { type, settings } = discount
-      
-      switch (type) {
-        case 'weekday': {
-          const bookingDay = new Date(bookingData.startDate).getDay()
-          const weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][bookingDay]
-          const percentage = settings.weekdays?.[weekday] || 0
-          finalAmount *= (1 - percentage / 100)
-          break
-        }
-        case 'earlyBird': {
-          const daysInAdvance = Math.floor((new Date(bookingData.startDate) - new Date()) / (1000 * 60 * 60 * 24))
-          if (daysInAdvance >= settings.minDays) {
-            finalAmount *= (1 - settings.percentage / 100)
-          }
-          break
-        }
-        case 'duration': {
-          const bookingDuration = Math.ceil((new Date(bookingData.endDate) - new Date(bookingData.startDate)) / (1000 * 60 * 60 * 24))
-          const applicableRule = settings.rules
-            ?.filter(rule => bookingDuration >= rule.minDays)
-            .reduce((max, rule) => rule.percentage > max.percentage ? rule : max, { percentage: 0 })
-          
-          if (applicableRule) {
-            finalAmount *= (1 - applicableRule.percentage / 100)
-          }
-          break
-        }
-        case 'seasonal': {
-          const bookingDate = new Date(bookingData.startDate)
-          const applicableRule = settings.rules
-            ?.filter(rule => {
-              const start = new Date(rule.startDate)
-              const end = new Date(rule.endDate)
-              return bookingDate >= start && bookingDate <= end
-            })
-            .reduce((max, rule) => rule.percentage > max.percentage ? rule : max, { percentage: 0 })
-          
-          if (applicableRule) {
-            finalAmount *= (1 - applicableRule.percentage / 100)
-          }
-          break
-        }
+    // Apply user group discount if applicable
+    if (userGroupId) {
+      const group = userGroups.value.find(g => g.id === userGroupId)
+      if (group?.discount) {
+        amount -= (amount * (group.discount / 100))
       }
-    })
+    }
 
-    return finalAmount
+    return Math.max(0, amount)
   }
 
-  // Gebühren nach Raum abrufen
-  const getFeesByRoom = computed(() => (roomId) => {
-    return fees.value.filter(fee => fee.roomIds?.includes(roomId))
-  })
-
-  // Gebühren nach Benutzergruppe abrufen
-  const getFeesByUserGroup = computed(() => (groupId) => {
-    return fees.value.filter(fee => fee.userGroupIds?.includes(groupId))
-  })
-
-  // Prüfen, ob eine Gebühr aktuell gültig ist
-  const isFeeCurrent = computed(() => (fee) => {
+  // Check if a fee is currently valid
+  function isFeeCurrent(fee) {
+    if (!fee) return false
     const now = new Date()
-    const startDate = new Date(fee.startDate)
+    const startDate = fee.startDate ? new Date(fee.startDate) : null
     const endDate = fee.endDate ? new Date(fee.endDate) : null
     
-    return startDate <= now && (!endDate || endDate >= now)
+    return (!startDate || startDate <= now) && (!endDate || endDate >= now)
+  }
+
+  // Get fees for a specific room
+  const getFeesByRoom = computed(() => (roomId) => {
+    return fees.value.filter(fee => 
+      fee.rooms.some(room => room.id === roomId)
+    )
   })
+
+  // Get fees for a specific user group
+  const getFeesByUserGroup = computed(() => (userGroupId) => {
+    return fees.value.filter(fee => 
+      fee.userGroupIds?.includes(userGroupId)
+    )
+  })
+
+  // Initialize store
+  loadFees()
 
   return {
     fees,
-    feeHistory,
+    editingFee,
     userGroups,
     addFee,
     updateFee,
     deleteFee,
+    getFee,
     calculateFee,
+    isFeeCurrent,
     getFeesByRoom,
     getFeesByUserGroup,
-    isFeeCurrent
+    loadFees
   }
 })

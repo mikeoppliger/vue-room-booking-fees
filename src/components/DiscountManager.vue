@@ -160,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useDiscountStore } from '@/stores/discountStore'
 import { useFeeStore } from '@/stores/feeStore'
 import DiscountEditor from './DiscountEditor.vue'
@@ -179,6 +179,12 @@ const editedDiscount = ref({
   name: '',
   type: '',
   settings: {}
+})
+
+watch(() => editedDiscount.value.type, (newType) => {
+  if (newType && !editingDiscount.value) {
+    editedDiscount.value.settings = discountStore.getDefaultSettings(newType)
+  }
 })
 
 const discountTypes = [
@@ -200,7 +206,10 @@ const getFeesForDiscount = (discountId) => {
 
 const editDiscount = (discount) => {
   editingDiscount.value = discount
-  editedDiscount.value = { ...discount }
+  editedDiscount.value = { 
+    ...discount,
+    settings: JSON.parse(discount.settings)
+  }
   showAddDialog.value = true
 }
 
