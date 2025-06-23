@@ -22,6 +22,21 @@
                 {{ editingFee ? 'Gebühr bearbeiten' : 'Neue Gebühr' }}
               </v-toolbar-title>
               <v-spacer></v-spacer>
+              
+              <!-- Fee Type Toggle Switch (only visible when form is shown) -->
+              <div v-if="feeTypeSelected || editingFee" class="d-flex align-center mr-4">
+                <span class="text-caption mr-2">Einfach</span>
+                <v-switch
+                  v-model="isComplexFee"
+                  color="primary"
+                  hide-details
+                  density="compact"
+                  inset
+                  @change="toggleFeeType"
+                ></v-switch>
+                <span class="text-caption ml-2">Komplex</span>
+              </div>
+              
               <v-btn
                 icon="mdi-close"
                 variant="text"
@@ -34,9 +49,12 @@
             </v-toolbar>
 
             <v-card-text class="pa-4">
+              
+              <!-- Fee Form -->
               <v-form v-model="valid" @submit.prevent="handleSubmit">
-                <v-slide-y-transition group>
-                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="basic-info">
+                <!-- Simple Fee View -->
+                <template v-if="feeType === 'simple'">
+                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="simple-basic-info">
                     <div class="d-flex align-center mb-3">
                       <v-icon color="primary" size="small" class="mr-2">mdi-information</v-icon>
                       <div class="text-subtitle-1 font-weight-medium">Grundinformationen</div>
@@ -58,7 +76,7 @@
                     <v-text-field
                       v-model.number="form.amount"
                       key="amount"
-                      label="Grundbetrag (€)"
+                      label="Grundbetrag (CHF)"
                       type="number"
                       variant="outlined"
                       density="comfortable"
@@ -69,154 +87,167 @@
                         v => v >= 0 || 'Betrag muss größer oder gleich 0 sein'
                       ]"
                       class="mb-3"
-                      prepend-inner-icon="mdi-currency-eur"
+                      prepend-inner-icon="mdi-currency-chf"
                     ></v-text-field>
-
+                  </v-sheet>
+                  
+                  <!-- Room Assignment for Simple Fee (not in accordion) -->
+                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="simple-room-assignment">
+                    <div class="d-flex align-center mb-3">
+                      <v-icon color="primary" size="small" class="mr-2">mdi-door</v-icon>
+                      <div class="text-subtitle-1 font-weight-medium">Raumzuweisung</div>
+                      <v-chip
+                        v-if="form.roomIds.length"
+                        size="small"
+                        color="primary"
+                        variant="elevated"
+                        class="ml-2"
+                      >
+                        {{ form.roomIds.length }} ausgewählt
+                      </v-chip>
+                    </div>
+                    
                     <v-select
-                      v-model="form.cycle"
-                      key="cycle"
-                      :items="billingCycles"
-                      label="Abrechnungszyklus"
+                      v-model="selectedRoomCategory"
+                      :items="roomCategories"
+                      label="Raumkategorie"
                       variant="outlined"
                       density="comfortable"
                       bg-color="white"
-                      required
-                      :rules="[v => !!v || 'Abrechnungszyklus ist erforderlich']"
                       class="mb-3"
-                      prepend-inner-icon="mdi-calendar-refresh"
+                      prepend-inner-icon="mdi-filter-variant"
                     ></v-select>
+
+                    <v-slide-y-transition group tag="div">
+                      <v-list v-if="filteredRooms.length" class="rounded-lg bg-white" elevation="1">
+                        <v-list-subheader class="bg-grey-lighten-4 font-weight-medium">
+                          Verfügbare Räume
+                        </v-list-subheader>
+                        <v-list-item
+                          v-for="room in filteredRooms"
+                          :key="room.id"
+                          :value="room.id"
+                          @click="toggleRoom(room.id)"
+                          :active="form.roomIds.includes(room.id)"
+                          :active-color="'primary'"
+                          class="room-item"
+                          rounded="lg"
+                        >
+                          <template v-slot:prepend>
+                            <v-checkbox-btn color="primary"></v-checkbox-btn>
+                          </template>
+                          <v-list-item-title class="font-weight-medium">{{ room.name }}</v-list-item-title>
+                          <template v-slot:append>
+                            <v-icon :icon="getRoomIcon(room)" class="mr-2" color="grey-darken-1"></v-icon>
+                            <v-chip size="small" color="grey-lighten-3" variant="elevated">
+                              {{ room.capacity }} Personen
+                            </v-chip>
+                          </template>
+                        </v-list-item>
+                      </v-list>
+                    </v-slide-y-transition>
                   </v-sheet>
                   
-                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="dates">
+                  <!-- Fakturierung for Simple Fee (not in accordion) -->
+                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="simple-invoicing">
                     <div class="d-flex align-center mb-3">
-                      <v-icon color="primary" size="small" class="mr-2">mdi-calendar-range</v-icon>
-                      <div class="text-subtitle-1 font-weight-medium">Gültigkeitszeitraum</div>
+                      <v-icon color="indigo" size="small" class="mr-2">mdi-file-document-outline</v-icon>
+                      <div class="text-subtitle-1 font-weight-medium">Fakturierung</div>
                     </div>
                     
                     <v-row>
                       <v-col cols="12" sm="6">
                         <v-text-field
-                          v-model="form.startDate"
-                          label="Gültig ab"
-                          type="date"
+                          v-model="form.invoiceTypeId"
+                          label="Rechnungsart ID"
                           variant="outlined"
                           density="comfortable"
                           bg-color="white"
-                          required
-                          :rules="[v => !!v || 'Startdatum ist erforderlich']"
-                          prepend-inner-icon="mdi-calendar-start"
+                          prepend-inner-icon="mdi-identifier"
                         ></v-text-field>
                       </v-col>
                       <v-col cols="12" sm="6">
                         <v-text-field
-                          v-model="form.endDate"
-                          label="Gültig bis"
-                          type="date"
+                          v-model="form.accountingTypeId"
+                          label="Verrechnungstyp ID"
                           variant="outlined"
                           density="comfortable"
                           bg-color="white"
-                          :rules="[
-                            v => !v || v >= form.startDate || 'Enddatum muss nach Startdatum liegen'
-                          ]"
-                          prepend-inner-icon="mdi-calendar-end"
+                          prepend-inner-icon="mdi-identifier"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" sm="6">
+                        <v-text-field
+                          v-model="form.serviceId"
+                          label="LeistungsKat. ID"
+                          variant="outlined"
+                          density="comfortable"
+                          bg-color="white"
+                          prepend-inner-icon="mdi-identifier"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" sm="6">
+                        <v-text-field
+                          v-model="form.accountId"
+                          label="HB Konto"
+                          variant="outlined"
+                          density="comfortable"
+                          bg-color="white"
+                          prepend-inner-icon="mdi-bank"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" sm="6">
+                        <v-select
+                          v-model="form.costCenter1"
+                          label="Kostenstelle 1"
+                          variant="outlined"
+                          density="comfortable"
+                          bg-color="white"
+                          :items="costCenters"
+                          prepend-inner-icon="mdi-office-building"
+                        ></v-select>
+                      </v-col>
+                      <v-col cols="12" sm="6">
+                        <v-text-field
+                          v-model="form.costCenter2"
+                          label="Kostenstelle 2"
+                          variant="outlined"
+                          density="comfortable"
+                          bg-color="white"
+                          prepend-inner-icon="mdi-office-building"
                         ></v-text-field>
                       </v-col>
                     </v-row>
                   </v-sheet>
-                </v-slide-y-transition>
-
-                <!-- Discount Assignment -->
-                <v-expansion-panels variant="accordion" class="mb-4">
-                  <v-expansion-panel
-                    rounded="lg"
-                    elevation="1"
-                    :value="0"
-                  >
-                    <v-expansion-panel-title>
-                      <div class="d-flex align-center">
-                        <v-avatar
-                          color="success"
-                          size="32"
-                          class="mr-2"
-                        >
-                          <v-icon icon="mdi-percent" color="white" size="small"></v-icon>
-                        </v-avatar>
-                        <span class="text-subtitle-1 font-weight-medium">Rabatte</span>
-                        <v-chip
-                          v-if="feeDiscounts.length"
-                          size="small"
-                          color="success"
-                          variant="elevated"
-                          class="ml-2"
-                        >
-                          {{ feeDiscounts.length }} zugewiesen
-                        </v-chip>
-                      </div>
-                    </v-expansion-panel-title>
-                    <v-expansion-panel-text class="bg-grey-lighten-5">
-                      <v-slide-y-transition group>
-                        <v-list v-if="feeDiscounts.length" class="rounded-lg bg-white mb-4" elevation="1">
-                          <v-list-subheader class="bg-grey-lighten-4 font-weight-medium">
-                            Zugewiesene Rabatte
-                          </v-list-subheader>
-                          <v-list-item
-                            v-for="discount in feeDiscounts"
-                            :key="discount.id"
-                            class="discount-item"
-                            rounded="lg"
-                          >
-                            <template v-slot:prepend>
-                              <v-avatar
-                                :color="getDiscountColor(discount) + '-lighten-4'"
-                                size="36"
-                              >
-                                <v-icon :icon="getDiscountIcon(discount)" :color="getDiscountColor(discount)" size="small"></v-icon>
-                              </v-avatar>
-                            </template>
-                            <v-list-item-title class="font-weight-medium">{{ discount.name }}</v-list-item-title>
-                            <v-list-item-subtitle>{{ getDiscountDescription(discount) }}</v-list-item-subtitle>
-                            <template v-slot:append>
-                              <v-chip size="small" :color="getDiscountColor(discount)" class="mr-2" variant="tonal">
-                                {{ getDiscountAmount(discount) }}
-                              </v-chip>
-                              <v-btn
-                                icon="mdi-delete"
-                                variant="text"
-                                size="small"
-                                color="error"
-                                @click="removeDiscount(discount.id)"
-                              >
-                                <v-tooltip activator="parent" location="top">
-                                  Rabatt entfernen
-                                </v-tooltip>
-                              </v-btn>
-                            </template>
-                          </v-list-item>
-                        </v-list>
-                      </v-slide-y-transition>
-
-                      <v-btn
-                        color="success"
-                        prepend-icon="mdi-plus"
-                        variant="elevated"
-                        rounded="pill"
-                        class="mt-2"
-                        @click="showDiscountDialog = true"
-                      >
-                        Rabatt hinzufügen
-                      </v-btn>
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
+                </template>
                 
-                <!-- Fee Calculator -->
-                <v-expansion-panels variant="accordion" class="mb-4">
-                  <v-expansion-panel
-                    rounded="lg"
-                    elevation="1"
-                    :value="0"
-                  >
-                    <v-expansion-panel-title>
+                <!-- Complex Fee View -->
+                <template v-if="feeType === 'complex'">
+                  <div>
+                    <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="complex-basic-info">
+                      <div class="d-flex align-center mb-3">
+                        <v-icon color="primary" size="small" class="mr-2">mdi-information</v-icon>
+                        <div class="text-subtitle-1 font-weight-medium">Grundinformationen</div>
+                      </div>
+                      
+                      <v-text-field
+                        v-model="form.name"
+                        key="name"
+                        label="Name"
+                        variant="outlined"
+                        density="comfortable"
+                        bg-color="white"
+                        required
+                        :rules="[v => !!v || 'Name ist erforderlich']"
+                        class="mb-3"
+                        prepend-inner-icon="mdi-format-title"
+                      ></v-text-field>
+                    </v-sheet>
+                  </div>
+                  
+                  <!-- Fee Calculator for Complex Fee (as card) -->
+                  <v-card class="mb-4 rounded-lg" elevation="1">
+                    <v-card-item>
                       <div class="d-flex align-center">
                         <v-avatar
                           color="amber-darken-1"
@@ -226,42 +257,36 @@
                           <v-icon icon="mdi-calculator" color="white" size="small"></v-icon>
                         </v-avatar>
                         <span class="text-subtitle-1 font-weight-medium">Gebührenrechner</span>
-                        <v-chip
-                          size="x-small"
-                          color="amber-darken-1"
-                          variant="outlined"
-                          class="ml-2"
-                        >
-                          Neu
-                        </v-chip>
                       </div>
-                    </v-expansion-panel-title>
-                    <v-expansion-panel-text class="pa-0">
-                      <fee-calculator />
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
+                    </v-card-item>
+                    <v-card-text class=" pt-0">
+                      <fee-calculator
+                        :fee="form"
+                        :discounts="feeDiscounts"
+                        class="fee-calculator"
+                      />
+                    </v-card-text>
+                  </v-card>
+                  
+                
+                
+
                 
                 <!-- Fakturierung (Invoicing) -->
-                <v-expansion-panels variant="accordion" class="mb-4">
-                  <v-expansion-panel
-                    rounded="lg"
-                    elevation="1"
-                    :value="0"
-                  >
-                    <v-expansion-panel-title>
-                      <div class="d-flex align-center">
-                        <v-avatar
-                          color="indigo"
-                          size="32"
-                          class="mr-2"
-                        >
-                          <v-icon icon="mdi-file-document-outline" color="white" size="small"></v-icon>
-                        </v-avatar>
-                        <span class="text-subtitle-1 font-weight-medium">Fakturierung</span>
-                      </div>
-                    </v-expansion-panel-title>
-                    <v-expansion-panel-text class="bg-grey-lighten-5">
+                <v-card class="mb-4 rounded-lg" elevation="1">
+                  <v-card-item>
+                    <div class="d-flex align-center">
+                      <v-avatar
+                        color="indigo"
+                        size="32"
+                        class="mr-2"
+                      >
+                        <v-icon icon="mdi-file-document-outline" color="white" size="small"></v-icon>
+                      </v-avatar>
+                      <span class="text-subtitle-1 font-weight-medium">Fakturierung</span>
+                    </div>
+                  </v-card-item>
+                  <v-card-text class="pt-0">
                       <v-row>
                         <v-col cols="12" sm="6">
                           <v-text-field
@@ -325,39 +350,33 @@
                           ></v-text-field>
                         </v-col>
                       </v-row>
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
+                  </v-card-text>
+                </v-card>
                 
                 <!-- Room Assignment -->
-                <v-expansion-panels variant="accordion" class="mb-4">
-                  <v-expansion-panel
-                    rounded="lg"
-                    elevation="1"
-                    :value="0"
-                  >
-                    <v-expansion-panel-title>
-                      <div class="d-flex align-center">
-                        <v-avatar
-                          color="primary"
-                          size="32"
-                          class="mr-2"
-                        >
-                          <v-icon icon="mdi-door" color="white" size="small"></v-icon>
-                        </v-avatar>
-                        <span class="text-subtitle-1 font-weight-medium">Raumzuweisung</span>
-                        <v-chip
-                          v-if="form.roomIds.length"
-                          size="small"
-                          color="primary"
-                          variant="elevated"
-                          class="ml-2"
-                        >
-                          {{ form.roomIds.length }} ausgewählt
-                        </v-chip>
-                      </div>
-                    </v-expansion-panel-title>
-                    <v-expansion-panel-text class="bg-grey-lighten-5">
+                <v-card class="mb-4 rounded-lg" elevation="1">
+                  <v-card-item>
+                    <div class="d-flex align-center">
+                      <v-avatar
+                        color="primary"
+                        size="32"
+                        class="mr-2"
+                      >
+                        <v-icon icon="mdi-door" color="white" size="small"></v-icon>
+                      </v-avatar>
+                      <span class="text-subtitle-1 font-weight-medium">Raumzuweisung</span>
+                      <v-chip
+                        v-if="form.roomIds.length"
+                        size="small"
+                        color="primary"
+                        variant="elevated"
+                        class="ml-2"
+                      >
+                        {{ form.roomIds.length }} ausgewählt
+                      </v-chip>
+                    </div>
+                  </v-card-item>
+                  <v-card-text class="pt-0">
                       <v-select
                         v-model="selectedRoomCategory"
                         :items="roomCategories"
@@ -369,7 +388,7 @@
                         prepend-inner-icon="mdi-filter-variant"
                       ></v-select>
 
-                      <v-slide-y-transition group>
+                      <v-slide-y-transition group tag="div">
                         <v-list v-if="filteredRooms.length" class="rounded-lg bg-white" elevation="1">
                           <v-list-subheader class="bg-grey-lighten-4 font-weight-medium">
                             Verfügbare Räume
@@ -397,9 +416,10 @@
                           </v-list-item>
                         </v-list>
                       </v-slide-y-transition>
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
+                  </v-card-text>
+                </v-card>
+                </template>
+                
                 <div class="d-flex justify-end mt-6">
                   <v-btn
                     variant="outlined"
@@ -547,17 +567,38 @@
 }
 
 .fee-calculator {
-  border: 1px solid rgba(0, 0, 0, 0.12);
   transition: all 0.3s ease;
+  padding: 0;
 }
 
 .fee-calculator:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
+
+.fee-type-selection {
+  padding: 24px 0;
+}
+
+.fee-type-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.fee-type-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.fee-features {
+  text-align: left;
+  padding-left: 16px;
+  margin-top: 8px;
+}
 </style>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useFeeStore } from '@/stores/feeStore'
 import { useDiscountStore } from '@/stores/discountStore'
@@ -579,13 +620,33 @@ const form = ref({
   userGroupIds: []
 })
 
+// Computed properties
+const editingFee = computed(() => !!route.params.id)
+
 // Initialize reactive refs
 const feeDiscounts = ref([])
 const showDiscountDialog = ref(false)
 const selectedDiscount = ref(null)
 const selectedRoomCategory = ref('')
-const valid = ref(true)
+const valid = ref(false)
 const isSubmitting = ref(false)
+const showHistory = ref(false)
+
+// Fee type selection
+const feeTypeSelected = ref(editingFee.value ? true : false)
+const feeType = ref(editingFee.value ? 'complex' : 'simple') // Default to complex for existing fees
+const isComplexFee = ref(feeType.value === 'complex')
+
+// Watch for changes in isComplexFee to update feeType
+watch(isComplexFee, (newValue) => {
+  feeType.value = newValue ? 'complex' : 'simple'
+})
+
+// Toggle between simple and complex fee types
+const toggleFeeType = () => {
+  // feeType is already updated by the watcher
+  // All form data is preserved since we're just changing the view
+}
 
 // Fee calculator state is now handled by the FeeCalculator component
 
@@ -621,8 +682,6 @@ const rooms = [
 ]
 
 // Computed properties
-const editingFee = computed(() => !!route.params.id)
-
 const filteredRooms = computed(() => {
   if (!selectedRoomCategory.value) return rooms
   return rooms.filter(room => room.category === selectedRoomCategory.value)
@@ -641,7 +700,47 @@ const feeHistory = computed(() => {
   return feeStore.feeHistory.filter(h => h.feeId === route.params.id)
 })
 
+// Lifecycle hooks
+onMounted(() => {
+  // Always set feeTypeSelected to true since we're showing the form directly
+  feeTypeSelected.value = true
+  
+  // If editing an existing fee, load its data
+  if (editingFee.value) {
+    const fee = feeStore.getFeeById(route.params.id)
+    if (fee) {
+      // Populate form with fee data
+      Object.keys(fee).forEach(key => {
+        if (key in form.value) {
+          form.value[key] = fee[key]
+        }
+      })
+      
+      // Set fee type based on existing fee properties
+      // If the fee has discounts or uses the calculator, it's complex
+      if (fee.hasDiscounts || fee.useCalculator) {
+        feeType.value = 'complex'
+        isComplexFee.value = true
+      } else {
+        feeType.value = 'simple'
+        isComplexFee.value = false
+      }
+      
+      // Load fee discounts if any
+      if (fee.discounts && fee.discounts.length) {
+        feeDiscounts.value = [...fee.discounts]
+      }
+    }
+  }
+})
+
 // Methods
+const selectFeeType = (type) => {
+  feeType.value = type
+  isComplexFee.value = type === 'complex'
+  feeTypeSelected.value = true
+}
+
 const getRoomIcon = (room) => {
   if (!room) return 'mdi-help-circle-outline'
   switch (room.category) {
@@ -824,24 +923,26 @@ const removeDiscount = (discountId) => {
   }
 }
 
-const handleSubmit = async () => {
-  if (!valid.value) return
-  
+// selectFeeType function is already defined above
+
+const handleSubmit = () => {
   isSubmitting.value = true
   
   try {
-    const feeData = {
-      ...form.value,
-      discountIds: feeDiscounts.value.map(d => d.id)
-    }
-    
     if (editingFee.value) {
-      await feeStore.updateFee(route.params.id, feeData)
+      feeStore.updateFee({
+        ...form,
+        id: route.params.id,
+        discounts: feeDiscounts.value
+      })
+      router.push(`/fees/${route.params.id}`)
     } else {
-      await feeStore.addFee(feeData)
+      const newFeeId = feeStore.addFee({
+        ...form,
+        discounts: feeDiscounts.value
+      })
+      router.push(`/fees/${newFeeId}`)
     }
-    
-    router.push('/fees')
   } catch (error) {
     console.error('Error saving fee:', error)
   } finally {
@@ -857,6 +958,17 @@ onMounted(() => {
       form.value = { ...fee }
       // Get discounts after form is populated
       feeDiscounts.value = discountStore.getDiscountsForFee(fee.id) || []
+      
+      // Determine fee type based on existing fee structure
+      // If the fee has discounts, it's a complex fee
+      if (feeDiscounts.value.length > 0) {
+        feeType.value = 'complex'
+      } else {
+        // Otherwise, determine based on amount
+        feeType.value = fee.amount > 0 ? 'simple' : 'complex'
+      }
+      
+      feeTypeSelected.value = true
     }
   }
 })
@@ -876,6 +988,8 @@ onUnmounted(() => {
   showDiscountDialog.value = false
   selectedDiscount.value = null
   selectedRoomCategory.value = ''
+  feeTypeSelected.value = false
+  feeType.value = 'simple'
   // Calculator state is now handled by the FeeCalculator component
 })
 

@@ -1,7 +1,7 @@
 <template>
   <div class="fee-calculator-container">
     <!-- Position Name Field -->
-    <v-sheet class="position-field mb-6 pa-4" rounded="lg" elevation="0" >
+    <v-sheet class="position-field mb-6 pt-4 pb-4" rounded="lg" elevation="0" >
       <div class="d-flex align-center mb-2">
         <v-icon color="primary" size="small" class="mr-2">mdi-tag-text</v-icon>
         <div class="text-subtitle-1 font-weight-medium">Positionsname</div>
@@ -26,7 +26,7 @@
 
     <!-- Calculation Row with editable labels -->
     <v-sheet class="calculation-container mb-6" rounded="lg" elevation="0" >
-      <div class="pa-4">
+      <div class="pt-4 pb-4">
         <div class="d-flex align-center mb-3">
           <v-icon color="primary" size="small" class="mr-2">mdi-calculator</v-icon>
           <div class="text-subtitle-1 font-weight-medium">Berechnung</div>
