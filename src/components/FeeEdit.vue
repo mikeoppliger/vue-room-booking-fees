@@ -6,14 +6,19 @@
           <!-- Fee Edit Form -->
           <v-card
             :loading="isSubmitting"
-            class="fee-edit-card"
+            class="fee-edit-card rounded-lg"
+            elevation="3"
           >
             <v-toolbar
               :color="editingFee ? 'primary' : 'success'"
-              dark
-              prominent
+              :class="editingFee ? 'bg-primary' : 'bg-success'"
+              flat
+              class="pl-4"
             >
-              <v-toolbar-title class="text-h5">
+              <template v-slot:prepend>
+                <v-icon :icon="editingFee ? 'mdi-pencil' : 'mdi-plus-circle'" class="mr-2"></v-icon>
+              </template>
+              <v-toolbar-title class="text-h6 font-weight-medium">
                 {{ editingFee ? 'Gebühr bearbeiten' : 'Neue Gebühr' }}
               </v-toolbar-title>
               <v-spacer></v-spacer>
@@ -28,173 +33,150 @@
               </v-btn>
             </v-toolbar>
 
-            <v-card-text>
+            <v-card-text class="pa-4">
               <v-form v-model="valid" @submit.prevent="handleSubmit">
                 <v-slide-y-transition group>
-                  <v-text-field
-                    v-model="form.name"
-                    key="name"
-                    label="Name"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    :rules="[v => !!v || 'Name ist erforderlich']"
-                    class="mb-4"
-                  ></v-text-field>
+                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="basic-info">
+                    <div class="d-flex align-center mb-3">
+                      <v-icon color="primary" size="small" class="mr-2">mdi-information</v-icon>
+                      <div class="text-subtitle-1 font-weight-medium">Grundinformationen</div>
+                    </div>
+                    
+                    <v-text-field
+                      v-model="form.name"
+                      key="name"
+                      label="Name"
+                      variant="outlined"
+                      density="comfortable"
+                      bg-color="white"
+                      required
+                      :rules="[v => !!v || 'Name ist erforderlich']"
+                      class="mb-3"
+                      prepend-inner-icon="mdi-format-title"
+                    ></v-text-field>
 
-                  <v-text-field
-                    v-model.number="form.amount"
-                    key="amount"
-                    label="Grundbetrag (€)"
-                    type="number"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    :rules="[
-                      v => !!v || 'Betrag ist erforderlich',
-                      v => v >= 0 || 'Betrag muss größer oder gleich 0 sein'
-                    ]"
-                    class="mb-4"
-                  ></v-text-field>
+                    <v-text-field
+                      v-model.number="form.amount"
+                      key="amount"
+                      label="Grundbetrag (€)"
+                      type="number"
+                      variant="outlined"
+                      density="comfortable"
+                      bg-color="white"
+                      required
+                      :rules="[
+                        v => !!v || 'Betrag ist erforderlich',
+                        v => v >= 0 || 'Betrag muss größer oder gleich 0 sein'
+                      ]"
+                      class="mb-3"
+                      prepend-inner-icon="mdi-currency-eur"
+                    ></v-text-field>
 
-                  <v-select
-                    v-model="form.cycle"
-                    key="cycle"
-                    :items="billingCycles"
-                    label="Abrechnungszyklus"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    :rules="[v => !!v || 'Abrechnungszyklus ist erforderlich']"
-                    class="mb-4"
-                  ></v-select>
-
-                  <v-row key="dates">
-                    <v-col cols="6">
-                      <v-text-field
-                        v-model="form.startDate"
-                        label="Gültig ab"
-                        type="date"
-                        variant="outlined"
-                        density="comfortable"
-                        required
-                        :rules="[v => !!v || 'Startdatum ist erforderlich']"
-                      ></v-text-field>
-                    </v-col>
-                    <v-col cols="6">
-                      <v-text-field
-                        v-model="form.endDate"
-                        label="Gültig bis"
-                        type="date"
-                        variant="outlined"
-                        density="comfortable"
-                        :rules="[
-                          v => !v || v >= form.startDate || 'Enddatum muss nach Startdatum liegen'
-                        ]"
-                      ></v-text-field>
-                    </v-col>
-                  </v-row>
+                    <v-select
+                      v-model="form.cycle"
+                      key="cycle"
+                      :items="billingCycles"
+                      label="Abrechnungszyklus"
+                      variant="outlined"
+                      density="comfortable"
+                      bg-color="white"
+                      required
+                      :rules="[v => !!v || 'Abrechnungszyklus ist erforderlich']"
+                      class="mb-3"
+                      prepend-inner-icon="mdi-calendar-refresh"
+                    ></v-select>
+                  </v-sheet>
+                  
+                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="dates">
+                    <div class="d-flex align-center mb-3">
+                      <v-icon color="primary" size="small" class="mr-2">mdi-calendar-range</v-icon>
+                      <div class="text-subtitle-1 font-weight-medium">Gültigkeitszeitraum</div>
+                    </div>
+                    
+                    <v-row>
+                      <v-col cols="12" sm="6">
+                        <v-text-field
+                          v-model="form.startDate"
+                          label="Gültig ab"
+                          type="date"
+                          variant="outlined"
+                          density="comfortable"
+                          bg-color="white"
+                          required
+                          :rules="[v => !!v || 'Startdatum ist erforderlich']"
+                          prepend-inner-icon="mdi-calendar-start"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" sm="6">
+                        <v-text-field
+                          v-model="form.endDate"
+                          label="Gültig bis"
+                          type="date"
+                          variant="outlined"
+                          density="comfortable"
+                          bg-color="white"
+                          :rules="[
+                            v => !v || v >= form.startDate || 'Enddatum muss nach Startdatum liegen'
+                          ]"
+                          prepend-inner-icon="mdi-calendar-end"
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+                  </v-sheet>
                 </v-slide-y-transition>
 
-                <!-- Room Assignment -->
-                <v-expand-transition>
-                  <v-card
-                    variant="outlined"
-                    class="mb-4"
-                  >
-                    <v-card-item>
-                      <template v-slot:prepend>
-                        <v-icon icon="mdi-door" color="primary"></v-icon>
-                      </template>
-                      <v-card-title>
-                        Raumzuweisung
-                        <v-chip
-                          v-if="form.roomIds.length"
-                          size="small"
-                          color="primary"
-                          class="ml-2"
-                        >
-                          {{ form.roomIds.length }} ausgewählt
-                        </v-chip>
-                      </v-card-title>
-                    </v-card-item>
-
-                    <v-card-text>
-                      <v-select
-                        v-model="selectedRoomCategory"
-                        :items="roomCategories"
-                        label="Raumkategorie"
-                        variant="outlined"
-                        density="comfortable"
-                        clearable
-                        class="mb-2"
-                      ></v-select>
-                      
-                      <v-slide-y-transition group>
-                        <v-list select-strategy="multiple" v-model:selected="form.roomIds">
-                          <v-list-item
-                            v-for="room in filteredRooms"
-                            :key="room.id"
-                            :value="room.id"
-                            :title="room.name"
-                            class="room-item"
-                          >
-                            <template v-slot:prepend>
-                              <v-checkbox-btn></v-checkbox-btn>
-                            </template>
-                            <template v-slot:append>
-                              <v-icon :icon="getRoomIcon(room)" class="mr-2"></v-icon>
-                              <v-chip size="small">
-                                {{ room.capacity }} Personen
-                              </v-chip>
-                            </template>
-                          </v-list-item>
-                        </v-list>
-                      </v-slide-y-transition>
-                    </v-card-text>
-                  </v-card>
-                </v-expand-transition>
-
                 <!-- Discount Assignment -->
-                <v-expand-transition>
-                  <v-card
-                    variant="outlined"
-                    class="mb-4"
+                <v-expansion-panels variant="accordion" class="mb-4">
+                  <v-expansion-panel
+                    rounded="lg"
+                    elevation="1"
+                    :value="0"
                   >
-                    <v-card-item>
-                      <template v-slot:prepend>
-                        <v-icon icon="mdi-percent" color="success"></v-icon>
-                      </template>
-                      <v-card-title>
-                        Rabatte
+                    <v-expansion-panel-title>
+                      <div class="d-flex align-center">
+                        <v-avatar
+                          color="success"
+                          size="32"
+                          class="mr-2"
+                        >
+                          <v-icon icon="mdi-percent" color="white" size="small"></v-icon>
+                        </v-avatar>
+                        <span class="text-subtitle-1 font-weight-medium">Rabatte</span>
                         <v-chip
                           v-if="feeDiscounts.length"
                           size="small"
                           color="success"
+                          variant="elevated"
                           class="ml-2"
                         >
                           {{ feeDiscounts.length }} zugewiesen
                         </v-chip>
-                      </v-card-title>
-                    </v-card-item>
-
-                    <v-card-text>
+                      </div>
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text class="bg-grey-lighten-5">
                       <v-slide-y-transition group>
-                        <v-list v-if="feeDiscounts.length">
+                        <v-list v-if="feeDiscounts.length" class="rounded-lg bg-white mb-4" elevation="1">
+                          <v-list-subheader class="bg-grey-lighten-4 font-weight-medium">
+                            Zugewiesene Rabatte
+                          </v-list-subheader>
                           <v-list-item
                             v-for="discount in feeDiscounts"
                             :key="discount.id"
                             class="discount-item"
+                            rounded="lg"
                           >
                             <template v-slot:prepend>
-                              <v-icon :icon="getDiscountIcon(discount)" :color="getDiscountColor(discount)"></v-icon>
+                              <v-avatar
+                                :color="getDiscountColor(discount) + '-lighten-4'"
+                                size="36"
+                              >
+                                <v-icon :icon="getDiscountIcon(discount)" :color="getDiscountColor(discount)" size="small"></v-icon>
+                              </v-avatar>
                             </template>
-                            
-                            <v-list-item-title>{{ discount.name }}</v-list-item-title>
+                            <v-list-item-title class="font-weight-medium">{{ discount.name }}</v-list-item-title>
                             <v-list-item-subtitle>{{ getDiscountDescription(discount) }}</v-list-item-subtitle>
-                            
                             <template v-slot:append>
-                              <v-chip size="small" :color="getDiscountColor(discount)" class="mr-2">
+                              <v-chip size="small" :color="getDiscountColor(discount)" class="mr-2" variant="tonal">
                                 {{ getDiscountAmount(discount) }}
                               </v-chip>
                               <v-btn
@@ -204,7 +186,7 @@
                                 color="error"
                                 @click="removeDiscount(discount.id)"
                               >
-                                <v-tooltip activator="parent" location="bottom">
+                                <v-tooltip activator="parent" location="top">
                                   Rabatt entfernen
                                 </v-tooltip>
                               </v-btn>
@@ -215,157 +197,237 @@
 
                       <v-btn
                         color="success"
-                        block
-                        class="mt-4"
                         prepend-icon="mdi-plus"
+                        variant="elevated"
+                        rounded="pill"
+                        class="mt-2"
                         @click="showDiscountDialog = true"
                       >
                         Rabatt hinzufügen
                       </v-btn>
-                    </v-card-text>
-                  </v-card>
-                </v-expand-transition>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+                
+                <!-- Fee Calculator -->
+                <v-expansion-panels variant="accordion" class="mb-4">
+                  <v-expansion-panel
+                    rounded="lg"
+                    elevation="1"
+                    :value="0"
+                  >
+                    <v-expansion-panel-title>
+                      <div class="d-flex align-center">
+                        <v-avatar
+                          color="amber-darken-1"
+                          size="32"
+                          class="mr-2"
+                        >
+                          <v-icon icon="mdi-calculator" color="white" size="small"></v-icon>
+                        </v-avatar>
+                        <span class="text-subtitle-1 font-weight-medium">Gebührenrechner</span>
+                        <v-chip
+                          size="x-small"
+                          color="amber-darken-1"
+                          variant="outlined"
+                          class="ml-2"
+                        >
+                          Neu
+                        </v-chip>
+                      </div>
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text class="pa-0">
+                      <fee-calculator />
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+                
+                <!-- Fakturierung (Invoicing) -->
+                <v-expansion-panels variant="accordion" class="mb-4">
+                  <v-expansion-panel
+                    rounded="lg"
+                    elevation="1"
+                    :value="0"
+                  >
+                    <v-expansion-panel-title>
+                      <div class="d-flex align-center">
+                        <v-avatar
+                          color="indigo"
+                          size="32"
+                          class="mr-2"
+                        >
+                          <v-icon icon="mdi-file-document-outline" color="white" size="small"></v-icon>
+                        </v-avatar>
+                        <span class="text-subtitle-1 font-weight-medium">Fakturierung</span>
+                      </div>
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text class="bg-grey-lighten-5">
+                      <v-row>
+                        <v-col cols="12" sm="6">
+                          <v-text-field
+                            v-model="form.invoiceTypeId"
+                            label="Rechnungsart ID"
+                            variant="outlined"
+                            density="comfortable"
+                            bg-color="white"
+                            prepend-inner-icon="mdi-identifier"
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="12" sm="6">
+                          <v-text-field
+                            v-model="form.accountingTypeId"
+                            label="Verrechnungstyp ID"
+                            variant="outlined"
+                            density="comfortable"
+                            bg-color="white"
+                            prepend-inner-icon="mdi-identifier"
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="12" sm="6">
+                          <v-text-field
+                            v-model="form.serviceId"
+                            label="LeistungsKat. ID"
+                            variant="outlined"
+                            density="comfortable"
+                            bg-color="white"
+                            prepend-inner-icon="mdi-identifier"
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="12" sm="6">
+                          <v-text-field
+                            v-model="form.accountId"
+                            label="HB Konto"
+                            variant="outlined"
+                            density="comfortable"
+                            bg-color="white"
+                            prepend-inner-icon="mdi-bank"
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="12" sm="6">
+                          <v-select
+                            v-model="form.costCenter1"
+                            label="Kostenstelle 1"
+                            variant="outlined"
+                            density="comfortable"
+                            bg-color="white"
+                            :items="costCenters"
+                            prepend-inner-icon="mdi-office-building"
+                          ></v-select>
+                        </v-col>
+                        <v-col cols="12" sm="6">
+                          <v-text-field
+                            v-model="form.costCenter2"
+                            label="Kostenstelle 2"
+                            variant="outlined"
+                            density="comfortable"
+                            bg-color="white"
+                            prepend-inner-icon="mdi-office-building"
+                          ></v-text-field>
+                        </v-col>
+                      </v-row>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+                
+                <!-- Room Assignment -->
+                <v-expansion-panels variant="accordion" class="mb-4">
+                  <v-expansion-panel
+                    rounded="lg"
+                    elevation="1"
+                    :value="0"
+                  >
+                    <v-expansion-panel-title>
+                      <div class="d-flex align-center">
+                        <v-avatar
+                          color="primary"
+                          size="32"
+                          class="mr-2"
+                        >
+                          <v-icon icon="mdi-door" color="white" size="small"></v-icon>
+                        </v-avatar>
+                        <span class="text-subtitle-1 font-weight-medium">Raumzuweisung</span>
+                        <v-chip
+                          v-if="form.roomIds.length"
+                          size="small"
+                          color="primary"
+                          variant="elevated"
+                          class="ml-2"
+                        >
+                          {{ form.roomIds.length }} ausgewählt
+                        </v-chip>
+                      </div>
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text class="bg-grey-lighten-5">
+                      <v-select
+                        v-model="selectedRoomCategory"
+                        :items="roomCategories"
+                        label="Raumkategorie"
+                        variant="outlined"
+                        density="comfortable"
+                        bg-color="white"
+                        class="mb-3"
+                        prepend-inner-icon="mdi-filter-variant"
+                      ></v-select>
+
+                      <v-slide-y-transition group>
+                        <v-list v-if="filteredRooms.length" class="rounded-lg bg-white" elevation="1">
+                          <v-list-subheader class="bg-grey-lighten-4 font-weight-medium">
+                            Verfügbare Räume
+                          </v-list-subheader>
+                          <v-list-item
+                            v-for="room in filteredRooms"
+                            :key="room.id"
+                            :value="room.id"
+                            @click="toggleRoom(room.id)"
+                            :active="form.roomIds.includes(room.id)"
+                            :active-color="'primary'"
+                            class="room-item"
+                            rounded="lg"
+                          >
+                            <template v-slot:prepend>
+                              <v-checkbox-btn color="primary"></v-checkbox-btn>
+                            </template>
+                            <v-list-item-title class="font-weight-medium">{{ room.name }}</v-list-item-title>
+                            <template v-slot:append>
+                              <v-icon :icon="getRoomIcon(room)" class="mr-2" color="grey-darken-1"></v-icon>
+                              <v-chip size="small" color="grey-lighten-3" variant="elevated">
+                                {{ room.capacity }} Personen
+                              </v-chip>
+                            </template>
+                          </v-list-item>
+                        </v-list>
+                      </v-slide-y-transition>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+                <div class="d-flex justify-end mt-6">
+                  <v-btn
+                    variant="outlined"
+                    class="mr-3"
+                    @click="router.push('/fees')"
+                    prepend-icon="mdi-arrow-left"
+                  >
+                    Abbrechen
+                  </v-btn>
+                  <v-btn
+                    color="primary"
+                    size="large"
+                    variant="elevated"
+                    :loading="isSubmitting"
+                    :disabled="!valid"
+                    @click="handleSubmit"
+                    append-icon="mdi-check"
+                  >
+                    {{ editingFee ? 'Speichern' : 'Erstellen' }}
+                  </v-btn>
+                </div>
               </v-form>
             </v-card-text>
-
-            <v-divider></v-divider>
-
-            <v-card-actions>
-              <v-spacer></v-spacer>
-              <v-btn
-                :loading="isSubmitting"
-                color="primary"
-                size="large"
-                @click="handleSubmit"
-                :disabled="!valid"
-              >
-                {{ editingFee ? 'Speichern' : 'Erstellen' }}
-              </v-btn>
-            </v-card-actions>
           </v-card>
-        </v-col>
-
-        <v-col cols="4">
-          <!-- Fee Preview -->
-          <v-slide-x-transition>
-            <v-card class="fee-preview-card">
-              <v-toolbar
-                color="primary"
-                dark
-              >
-                <v-toolbar-title>Vorschau</v-toolbar-title>
-              </v-toolbar>
-              <v-card-text>
-                <v-list>
-                  <v-list-item>
-                    <v-list-item-title>Grundbetrag</v-list-item-title>
-                    <template v-slot:append>
-                      <strong>{{ formatCurrency(form.amount) }}</strong>
-                    </template>
-                  </v-list-item>
-
-                  <v-list-subheader v-if="feeDiscounts.length">Rabatte</v-list-subheader>
-                  <v-slide-y-transition group>
-                    <v-list-item
-                      v-for="discount in feeDiscounts"
-                      :key="discount.id"
-                      density="compact"
-                    >
-                      <v-list-item-title class="text-caption">
-                        {{ discount.name }}
-                      </v-list-item-title>
-                      <template v-slot:append>
-                        <span class="text-caption">{{ getDiscountAmount(discount) }}</span>
-                      </template>
-                    </v-list-item>
-                  </v-slide-y-transition>
-                </v-list>
-              </v-card-text>
-            </v-card>
-          </v-slide-x-transition>
-
-          <!-- Change History -->
-          <v-slide-x-transition>
-            <v-card v-if="editingFee" class="mt-4 history-card">
-              <v-toolbar
-                color="primary"
-                dark
-              >
-                <v-toolbar-title>Änderungsverlauf</v-toolbar-title>
-              </v-toolbar>
-              <v-card-text>
-                <v-list density="compact" class="mb-4">
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <v-icon icon="mdi-clock-start" color="primary"></v-icon>
-                    </template>
-                    <v-list-item-title>Erste Änderung</v-list-item-title>
-                    <template v-slot:append>
-                      {{ formatDate(feeHistory[0]?.timestamp) }}
-                    </template>
-                  </v-list-item>
-
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <v-icon icon="mdi-clock-end" color="primary"></v-icon>
-                    </template>
-                    <v-list-item-title>Letzte Änderung</v-list-item-title>
-                    <template v-slot:append>
-                      {{ formatDate(feeHistory[feeHistory.length - 1]?.timestamp) }}
-                    </template>
-                  </v-list-item>
-
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <v-icon icon="mdi-counter" color="primary"></v-icon>
-                    </template>
-                    <v-list-item-title>Anzahl Änderungen</v-list-item-title>
-                    <template v-slot:append>
-                      {{ feeHistory.length }}
-                    </template>
-                  </v-list-item>
-                </v-list>
-
-                <div class="timeline-container">
-                  <v-timeline side="end" truncate-line="both">
-                    <v-slide-y-transition group>
-                      <v-timeline-item
-                        v-for="change in feeHistory"
-                        :key="change.timestamp"
-                        :dot-color="getTimelineDotColor(change.type)"
-                        size="small"
-                      >
-                        <v-card>
-                          <v-card-title class="text-subtitle-2">
-                            {{ getChangeTypeText(change.type) }}
-                            <span class="text-caption ml-2">
-                              {{ formatDate(change.timestamp) }}
-                            </span>
-                          </v-card-title>
-                          <v-card-text class="pt-2">
-                            <template v-if="change.changes">
-                              <div v-for="(value, field) in change.changes" :key="field">
-                                <strong>{{ getFieldLabel(field) }}:</strong>
-                                {{ formatValue(value) }}
-                              </div>
-                            </template>
-                            <div v-else class="text-caption">
-                              Keine detaillierten Änderungen verfügbar
-                            </div>
-                          </v-card-text>
-                        </v-card>
-                      </v-timeline-item>
-                    </v-slide-y-transition>
-                  </v-timeline>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-slide-x-transition>
         </v-col>
       </v-row>
     </v-fade-transition>
 
-    <!-- Add Discount Dialog -->
     <v-dialog
       v-model="showDiscountDialog"
       max-width="500px"
@@ -483,13 +545,23 @@
 .v-list-item {
   min-height: 48px;
 }
+
+.fee-calculator {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  transition: all 0.3s ease;
+}
+
+.fee-calculator:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
 </style>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useFeeStore } from '@/stores/feeStore'
 import { useDiscountStore } from '@/stores/discountStore'
+import FeeCalculator from '@/components/FeeCalculator.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -515,6 +587,8 @@ const selectedRoomCategory = ref('')
 const valid = ref(true)
 const isSubmitting = ref(false)
 
+// Fee calculator state is now handled by the FeeCalculator component
+
 // Static data
 const billingCycles = [
   'Täglich',
@@ -522,6 +596,15 @@ const billingCycles = [
   'Monatlich',
   'Jährlich',
   'Einmalig'
+]
+
+const costCenters = [
+  'Marketing',
+  'Vertrieb',
+  'IT',
+  'Verwaltung',
+  'Finanzen',
+  'Personal'
 ]
 
 const roomCategories = [
@@ -593,24 +676,25 @@ const getDiscountIcon = (discount) => {
   }
 }
 
-const getDiscountColor = (discount) => {
-  if (!discount?.type) return 'grey'
-  switch (discount.type) {
-    case 'percentage':
-      return 'success'
-    case 'fixed':
-      return 'primary'
-    case 'weekday':
-      return 'info'
-    case 'earlyBird':
-      return 'warning'
-    case 'duration':
-      return 'purple'
-    case 'seasonal':
-      return 'orange'
-    default:
-      return 'grey'
+const getDiscountColor = (type) => {
+  switch (type) {
+    case 'percentage': return 'blue'
+    case 'fixed': return 'green'
+    case 'weekday': return 'orange'
+    case 'earlyBird': return 'cyan'
+    case 'duration': return 'indigo'
+    case 'seasonal': return 'deep-purple'
+    default: return 'grey'
   }
+}
+
+const getResultColor = (discount, total) => {
+  const percentage = (discount / total) * 100
+  if (percentage === 0) return 'grey-lighten-3'
+  if (percentage < 10) return 'light-blue-lighten-5'
+  if (percentage < 25) return 'light-blue-lighten-4'
+  if (percentage < 50) return 'light-blue-lighten-3'
+  return 'light-blue-lighten-2'
 }
 
 const formatDate = (timestamp) => {
@@ -724,6 +808,47 @@ const getDiscountDescription = (discount) => {
   }
 }
 
+const toggleRoom = (roomId) => {
+  const index = form.value.roomIds.indexOf(roomId)
+  if (index === -1) {
+    form.value.roomIds.push(roomId)
+  } else {
+    form.value.roomIds.splice(index, 1)
+  }
+}
+
+const removeDiscount = (discountId) => {
+  const index = feeDiscounts.value.findIndex(d => d.id === discountId)
+  if (index !== -1) {
+    feeDiscounts.value.splice(index, 1)
+  }
+}
+
+const handleSubmit = async () => {
+  if (!valid.value) return
+  
+  isSubmitting.value = true
+  
+  try {
+    const feeData = {
+      ...form.value,
+      discountIds: feeDiscounts.value.map(d => d.id)
+    }
+    
+    if (editingFee.value) {
+      await feeStore.updateFee(route.params.id, feeData)
+    } else {
+      await feeStore.addFee(feeData)
+    }
+    
+    router.push('/fees')
+  } catch (error) {
+    console.error('Error saving fee:', error)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 // Lifecycle hooks
 onMounted(() => {
   if (editingFee.value) {
@@ -751,6 +876,7 @@ onUnmounted(() => {
   showDiscountDialog.value = false
   selectedDiscount.value = null
   selectedRoomCategory.value = ''
+  // Calculator state is now handled by the FeeCalculator component
 })
 
 // Actions
@@ -806,43 +932,5 @@ const addSelectedDiscount = () => {
   selectedDiscount.value = null
 }
 
-const removeDiscount = (discountId) => {
-  if (form.value.id) {
-    discountStore.removeDiscountFromFee(form.value.id, discountId)
-    // Refresh the discounts list
-    feeDiscounts.value = discountStore.getDiscountsForFee(form.value.id) || []
-  } else {
-    // If fee is not saved yet, just remove from local list
-    feeDiscounts.value = feeDiscounts.value.filter(d => d.id !== discountId)
-  }
-}
-
-const handleSubmit = async () => {
-  if (!valid.value) return
-
-  const feeData = {
-    ...form.value,
-    id: editingFee.value ? route.params.id : undefined
-  }
-
-  isSubmitting.value = true
-
-  let savedFee
-  if (editingFee.value) {
-    savedFee = feeStore.updateFee(feeData)
-  } else {
-    savedFee = feeStore.addFee(feeData)
-    
-    // Add all discounts if this is a new fee
-    if (savedFee) {
-      await Promise.all(feeDiscounts.value.map(discount => 
-        discountStore.addDiscountToFee(savedFee.id, discount.id, discount.settings)
-      ))
-    }
-  }
-
-  isSubmitting.value = false
-
-  router.push('/fees')
-}
+// handleSubmit function is already defined above
 </script>
