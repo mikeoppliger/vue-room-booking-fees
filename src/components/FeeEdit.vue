@@ -23,20 +23,6 @@
               </v-toolbar-title>
               <v-spacer></v-spacer>
               
-              <!-- Fee Type Toggle Switch (only visible when form is shown) -->
-              <div v-if="feeTypeSelected || editingFee" class="d-flex align-center mr-4">
-                <span class="text-caption mr-2">Einfach</span>
-                <v-switch
-                  v-model="isComplexFee"
-                  color="primary"
-                  hide-details
-                  density="compact"
-                  inset
-                  @change="toggleFeeType"
-                ></v-switch>
-                <span class="text-caption ml-2">Komplex</span>
-              </div>
-              
               <v-btn
                 icon="mdi-close"
                 variant="text"
@@ -52,9 +38,9 @@
               
               <!-- Fee Form -->
               <v-form v-model="valid" @submit.prevent="handleSubmit">
-                <!-- Simple Fee View -->
-                <template v-if="feeType === 'simple'">
-                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="simple-basic-info">
+                <!-- Complex Fee View -->
+                <div>
+                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="complex-basic-info">
                     <div class="d-flex align-center mb-3">
                       <v-icon color="primary" size="small" class="mr-2">mdi-information</v-icon>
                       <div class="text-subtitle-1 font-weight-medium">Grundinformationen</div>
@@ -88,189 +74,38 @@
                       ]"
                       class="mb-3"
                       prepend-inner-icon="mdi-currency-chf"
+                      :disabled="isCalculatorActive"
+                      :hint="isCalculatorActive ? 'Deaktiviert: Gebührenrechner wird verwendet' : ''"
+                      persistent-hint
                     ></v-text-field>
                   </v-sheet>
-                  
-                  <!-- Room Assignment for Simple Fee (not in accordion) -->
-                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="simple-room-assignment">
-                    <div class="d-flex align-center mb-3">
-                      <v-icon color="primary" size="small" class="mr-2">mdi-door</v-icon>
-                      <div class="text-subtitle-1 font-weight-medium">Raumzuweisung</div>
-                      <v-chip
-                        v-if="form.roomIds.length"
-                        size="small"
-                        color="primary"
-                        variant="elevated"
-                        class="ml-2"
+                </div>
+                
+                <!-- Fee Calculator for Complex Fee (as card) -->
+                <v-card class="mb-4 rounded-lg" elevation="1">
+                  <v-card-item>
+                    <div class="d-flex align-center">
+                      <v-avatar
+                        color="amber-darken-1"
+                        size="32"
+                        class="mr-2"
                       >
-                        {{ form.roomIds.length }} ausgewählt
-                      </v-chip>
+                        <v-icon icon="mdi-calculator" color="white" size="small"></v-icon>
+                      </v-avatar>
+                      <span class="text-subtitle-1 font-weight-medium">Gebührenrechner</span>
                     </div>
-                    
-                    <v-select
-                      v-model="selectedRoomCategory"
-                      :items="roomCategories"
-                      label="Raumkategorie"
-                      variant="outlined"
-                      density="comfortable"
-                      bg-color="white"
-                      class="mb-3"
-                      prepend-inner-icon="mdi-filter-variant"
-                    ></v-select>
-
-                    <v-slide-y-transition group tag="div">
-                      <v-list v-if="filteredRooms.length" class="rounded-lg bg-white" elevation="1">
-                        <v-list-subheader class="bg-grey-lighten-4 font-weight-medium">
-                          Verfügbare Räume
-                        </v-list-subheader>
-                        <v-list-item
-                          v-for="room in filteredRooms"
-                          :key="room.id"
-                          :value="room.id"
-                          @click="toggleRoom(room.id)"
-                          :active="form.roomIds.includes(room.id)"
-                          :active-color="'primary'"
-                          class="room-item"
-                          rounded="lg"
-                        >
-                          <template v-slot:prepend>
-                            <v-checkbox-btn color="primary"></v-checkbox-btn>
-                          </template>
-                          <v-list-item-title class="font-weight-medium">{{ room.name }}</v-list-item-title>
-                          <template v-slot:append>
-                            <v-icon :icon="getRoomIcon(room)" class="mr-2" color="grey-darken-1"></v-icon>
-                            <v-chip size="small" color="grey-lighten-3" variant="elevated">
-                              {{ room.capacity }} Personen
-                            </v-chip>
-                          </template>
-                        </v-list-item>
-                      </v-list>
-                    </v-slide-y-transition>
-                  </v-sheet>
-                  
-                  <!-- Fakturierung for Simple Fee (not in accordion) -->
-                  <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="simple-invoicing">
-                    <div class="d-flex align-center mb-3">
-                      <v-icon color="indigo" size="small" class="mr-2">mdi-file-document-outline</v-icon>
-                      <div class="text-subtitle-1 font-weight-medium">Fakturierung</div>
-                    </div>
-                    
-                    <v-row>
-                      <v-col cols="12" sm="6">
-                        <v-text-field
-                          v-model="form.invoiceTypeId"
-                          label="Rechnungsart ID"
-                          variant="outlined"
-                          density="comfortable"
-                          bg-color="white"
-                          prepend-inner-icon="mdi-identifier"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="12" sm="6">
-                        <v-text-field
-                          v-model="form.accountingTypeId"
-                          label="Verrechnungstyp ID"
-                          variant="outlined"
-                          density="comfortable"
-                          bg-color="white"
-                          prepend-inner-icon="mdi-identifier"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="12" sm="6">
-                        <v-text-field
-                          v-model="form.serviceId"
-                          label="LeistungsKat. ID"
-                          variant="outlined"
-                          density="comfortable"
-                          bg-color="white"
-                          prepend-inner-icon="mdi-identifier"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="12" sm="6">
-                        <v-text-field
-                          v-model="form.accountId"
-                          label="HB Konto"
-                          variant="outlined"
-                          density="comfortable"
-                          bg-color="white"
-                          prepend-inner-icon="mdi-bank"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="12" sm="6">
-                        <v-select
-                          v-model="form.costCenter1"
-                          label="Kostenstelle 1"
-                          variant="outlined"
-                          density="comfortable"
-                          bg-color="white"
-                          :items="costCenters"
-                          prepend-inner-icon="mdi-office-building"
-                        ></v-select>
-                      </v-col>
-                      <v-col cols="12" sm="6">
-                        <v-text-field
-                          v-model="form.costCenter2"
-                          label="Kostenstelle 2"
-                          variant="outlined"
-                          density="comfortable"
-                          bg-color="white"
-                          prepend-inner-icon="mdi-office-building"
-                        ></v-text-field>
-                      </v-col>
-                    </v-row>
-                  </v-sheet>
-                </template>
-                
-                <!-- Complex Fee View -->
-                <template v-if="feeType === 'complex'">
-                  <div>
-                    <v-sheet class="pa-4 mb-4 rounded-lg" color="grey-lighten-5" key="complex-basic-info">
-                      <div class="d-flex align-center mb-3">
-                        <v-icon color="primary" size="small" class="mr-2">mdi-information</v-icon>
-                        <div class="text-subtitle-1 font-weight-medium">Grundinformationen</div>
-                      </div>
-                      
-                      <v-text-field
-                        v-model="form.name"
-                        key="name"
-                        label="Name"
-                        variant="outlined"
-                        density="comfortable"
-                        bg-color="white"
-                        required
-                        :rules="[v => !!v || 'Name ist erforderlich']"
-                        class="mb-3"
-                        prepend-inner-icon="mdi-format-title"
-                      ></v-text-field>
-                    </v-sheet>
-                  </div>
-                  
-                  <!-- Fee Calculator for Complex Fee (as card) -->
-                  <v-card class="mb-4 rounded-lg" elevation="1">
-                    <v-card-item>
-                      <div class="d-flex align-center">
-                        <v-avatar
-                          color="amber-darken-1"
-                          size="32"
-                          class="mr-2"
-                        >
-                          <v-icon icon="mdi-calculator" color="white" size="small"></v-icon>
-                        </v-avatar>
-                        <span class="text-subtitle-1 font-weight-medium">Gebührenrechner</span>
-                      </div>
-                    </v-card-item>
-                    <v-card-text class=" pt-0">
-                      <fee-calculator
-                        :fee="form"
-                        :discounts="feeDiscounts"
-                        class="fee-calculator"
-                      />
-                    </v-card-text>
-                  </v-card>
-                  
-                
-                
-
+                  </v-card-item>
+                  <v-card-text class="pt-0">
+                    <fee-calculator
+                      :fee="form"
+                      :discounts="feeDiscounts"
+                      class="fee-calculator"
+                      @calculator-input="handleCalculatorInput"
+                      @calculator-empty="handleCalculatorEmpty"
+                      @final-result-change="handleFinalResultChange"
+                    />
+                  </v-card-text>
+                </v-card>
                 
                 <!-- Fakturierung (Invoicing) -->
                 <v-card class="mb-4 rounded-lg" elevation="1">
@@ -418,7 +253,6 @@
                       </v-slide-y-transition>
                   </v-card-text>
                 </v-card>
-                </template>
                 
                 <div class="d-flex justify-end mt-6">
                   <v-btn
@@ -1047,4 +881,23 @@ const addSelectedDiscount = () => {
 }
 
 // handleSubmit function is already defined above
+
+const isCalculatorActive = ref(false)
+const calculatedFinalAmount = ref(0)
+
+const handleCalculatorInput = () => {
+  isCalculatorActive.value = true
+}
+
+const handleCalculatorEmpty = () => {
+  isCalculatorActive.value = false
+}
+
+const handleFinalResultChange = (finalResult) => {
+  calculatedFinalAmount.value = parseFloat(finalResult) || 0
+  // Update the form amount with the calculated result
+  if (isCalculatorActive.value) {
+    form.value.amount = calculatedFinalAmount.value
+  }
+}
 </script>
