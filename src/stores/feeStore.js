@@ -14,7 +14,28 @@ export const useFeeStore = defineStore('fees', () => {
   const loadFromStorage = () => {
     const storedFees = localStorage.getItem('fees')
     if (storedFees) {
-      fees.value = JSON.parse(storedFees)
+      try {
+        // Parse the stored fees
+        const parsedFees = JSON.parse(storedFees)
+        
+        // Filter out invalid entries (empty objects, null, undefined, or objects without required fields)
+        fees.value = parsedFees.filter(fee => {
+          return fee && 
+                 typeof fee === 'object' && 
+                 Object.keys(fee).length > 0 &&
+                 fee.id && 
+                 fee.name;
+        });
+        
+        // If we filtered out any fees, save the cleaned list back to storage
+        if (parsedFees.length !== fees.value.length) {
+          console.log(`Filtered out ${parsedFees.length - fees.value.length} invalid fee entries`);
+          saveToStorage();
+        }
+      } catch (error) {
+        console.error('Error parsing fees from localStorage:', error);
+        fees.value = [];
+      }
     }
   }
 
@@ -52,35 +73,81 @@ export const useFeeStore = defineStore('fees', () => {
   // Update an existing fee
   async function updateFee(feeData) {
     try {
-      const index = fees.value.findIndex(f => f.id === feeData.id)
-      if (index === -1) return null
+      console.log('updateFee called with data:', JSON.stringify(feeData));
+      console.log('Current fees array:', JSON.stringify(fees.value));
+      
+      const index = fees.value.findIndex(f => f.id === feeData.id);
+      console.log('Found fee at index:', index, 'for ID:', feeData.id);
+      
+      if (index === -1) {
+        console.error('Fee not found with ID:', feeData.id);
+        return null;
+      }
 
       const updatedFee = {
         ...fees.value[index],
         ...feeData,
         updatedAt: new Date().toISOString()
-      }
+      };
+      console.log('Merged updated fee:', JSON.stringify(updatedFee));
       
-      fees.value[index] = updatedFee
-      saveToStorage()
-      return updatedFee
+      fees.value[index] = updatedFee;
+      console.log('Updated fees array at index', index);
+      
+      saveToStorage();
+      console.log('Saved to localStorage');
+      
+      // Force a refresh of localStorage to ensure data is persisted
+      localStorage.setItem('fees', JSON.stringify(fees.value));
+      console.log('Forced localStorage refresh');
+      
+      return updatedFee;
     } catch (error) {
-      console.error('Failed to update fee:', error)
-      throw error
+      console.error('Failed to update fee:', error);
+      throw error;
     }
   }
 
   // Delete a fee
   async function deleteFee(id) {
     try {
+      console.log('Deleting fee with ID:', id)
+      console.log('Current fees before deletion:', JSON.parse(JSON.stringify(fees.value)))
+      
       const index = fees.value.findIndex(f => f.id === id)
-      if (index === -1) return false
+      console.log('Found fee at index:', index)
+      
+      if (index === -1) {
+        console.error('Fee not found with ID:', id)
+        return false
+      }
 
-      fees.value.splice(index, 1)
+      // Remove the fee
+      const deletedFee = fees.value.splice(index, 1)[0]
+      console.log('Deleted fee:', deletedFee)
+      
+      // Save to storage
       saveToStorage()
+      console.log('Updated fees after deletion:', JSON.parse(JSON.stringify(fees.value)))
+      
+      // Force a refresh of localStorage
+      localStorage.setItem('fees', JSON.stringify(fees.value))
+      
       return true
     } catch (error) {
       console.error('Failed to delete fee:', error)
+      throw error
+    }
+  }
+  
+  // Clear all fees
+  function clearAllFees() {
+    try {
+      fees.value = []
+      saveToStorage()
+      return true
+    } catch (error) {
+      console.error('Failed to clear fees:', error)
       throw error
     }
   }
@@ -184,6 +251,7 @@ export const useFeeStore = defineStore('fees', () => {
     addFee,
     updateFee,
     deleteFee,
+    clearAllFees,
     getFee,
     calculateFee,
     isFeeCurrent,

@@ -202,7 +202,7 @@
                       </v-avatar>
                       <span class="text-subtitle-1 font-weight-medium">Raumzuweisung</span>
                       <v-chip
-                        v-if="form.roomIds.length"
+                        v-if="form.roomIds && form.roomIds.length"
                         size="small"
                         color="primary"
                         variant="elevated"
@@ -235,7 +235,7 @@
                             :value="room.id"
                             @click="toggleRoom(room.id)"
                             :active="form.roomIds.includes(room.id)"
-                            :active-color="'primary'"
+                            color="primary"
                             class="room-item"
                             rounded="lg"
                           >
@@ -331,6 +331,15 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-snackbar
+      v-model="showErrorAlert"
+      :timeout="3000"
+      color="error"
+      location="bottom"
+    >
+      {{ errorMessage }}
+    </v-snackbar>
   </v-container>
 </template>
 
@@ -466,6 +475,8 @@ const selectedRoomCategory = ref('')
 const valid = ref(false)
 const isSubmitting = ref(false)
 const showHistory = ref(false)
+const showErrorAlert = ref(false)
+const errorMessage = ref('')
 
 // Fee type selection
 const feeTypeSelected = ref(editingFee.value ? true : false)
@@ -542,28 +553,33 @@ onMounted(() => {
   
   // If editing an existing fee, load its data
   if (editingFee.value) {
-    const fee = feeStore.getFeeById(route.params.id)
+    const fee = feeStore.getFee(route.params.id)
     if (fee) {
-      // Populate form with fee data
-      Object.keys(fee).forEach(key => {
-        if (key in form.value) {
-          form.value[key] = fee[key]
-        }
-      })
+      // Directly assign the entire fee object to form.value, ensuring all properties exist
+      form.value = { 
+        name: '',
+        amount: 0,
+        cycle: 'Täglich',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: null,
+        roomIds: [],
+        userGroupIds: [],
+        ...fee 
+      }
+      
+      // Load fee discounts if any
+      feeDiscounts.value = fee.discounts && fee.discounts.length 
+        ? [...fee.discounts] 
+        : discountStore.getDiscountsForFee(fee.id) || []
       
       // Set fee type based on existing fee properties
       // If the fee has discounts or uses the calculator, it's complex
-      if (fee.hasDiscounts || fee.useCalculator) {
+      if ((feeDiscounts.value && feeDiscounts.value.length > 0) || fee.useCalculator) {
         feeType.value = 'complex'
         isComplexFee.value = true
       } else {
         feeType.value = 'simple'
         isComplexFee.value = false
-      }
-      
-      // Load fee discounts if any
-      if (fee.discounts && fee.discounts.length) {
-        feeDiscounts.value = [...fee.discounts]
       }
     }
   }
@@ -760,54 +776,75 @@ const removeDiscount = (discountId) => {
 
 // selectFeeType function is already defined above
 
-const handleSubmit = () => {
-  isSubmitting.value = true
+const handleSubmit = async () => {
+  isSubmitting.value = true;
+  console.log('Form submission started');
+  console.log('Form data:', JSON.stringify(form.value));
+  console.log('Fee discounts:', JSON.stringify(feeDiscounts.value));
+  console.log('Route params:', route.params);
+  console.log('Editing fee?', editingFee.value);
   
   try {
     if (editingFee.value) {
-      feeStore.updateFee({
-        ...form,
-        id: route.params.id,
+      // Check if we have a valid ID (not undefined or the string "undefined")
+      const feeId = route.params.id;
+      if (!feeId || feeId === 'undefined') {
+        console.error('Invalid fee ID:', feeId);
+        errorMessage.value = 'Ungültige Gebühren-ID. Bitte versuchen Sie es erneut.';
+        showErrorAlert.value = true;
+        isSubmitting.value = false;
+        return;
+      }
+      
+      const updateData = {
+        ...form.value,
+        id: feeId,
         discounts: feeDiscounts.value
-      })
-      router.push(`/fees/${route.params.id}`)
+      };
+      console.log('Updating fee with data:', JSON.stringify(updateData));
+      
+      const updatedFee = await feeStore.updateFee(updateData);
+      console.log('Fee update result:', updatedFee ? 'Success' : 'Failed');
+      console.log('Updated fee data:', JSON.stringify(updatedFee));
+      
+      if (updatedFee) {
+        console.log('Navigating to fee details page');
+        router.push(`/fees/${feeId}`);
+      } else {
+        console.error('Fee update returned null');
+        errorMessage.value = 'Fehler beim Speichern der Gebühr.';
+        showErrorAlert.value = true;
+      }
     } else {
-      const newFeeId = feeStore.addFee({
-        ...form,
+      const newFeeData = {
+        ...form.value,
         discounts: feeDiscounts.value
-      })
-      router.push(`/fees/${newFeeId}`)
+      };
+      console.log('Adding new fee with data:', JSON.stringify(newFeeData));
+      
+      const newFee = await feeStore.addFee(newFeeData);
+      console.log('New fee created:', JSON.stringify(newFee));
+      
+      if (newFee && newFee.id) {
+        console.log('Navigating to fee overview page');
+        router.push('/fees');
+      } else {
+        console.error('New fee creation failed or returned invalid data');
+        errorMessage.value = 'Fehler beim Erstellen der Gebühr.';
+        showErrorAlert.value = true;
+      }
     }
   } catch (error) {
-    console.error('Error saving fee:', error)
+    console.error('Error saving fee:', error);
+    errorMessage.value = 'Fehler beim Speichern der Gebühr.';
+    showErrorAlert.value = true;
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
+    console.log('Form submission completed');
   }
 }
 
 // Lifecycle hooks
-onMounted(() => {
-  if (editingFee.value) {
-    const fee = feeStore.fees.find(f => f.id === route.params.id)
-    if (fee) {
-      form.value = { ...fee }
-      // Get discounts after form is populated
-      feeDiscounts.value = discountStore.getDiscountsForFee(fee.id) || []
-      
-      // Determine fee type based on existing fee structure
-      // If the fee has discounts, it's a complex fee
-      if (feeDiscounts.value.length > 0) {
-        feeType.value = 'complex'
-      } else {
-        // Otherwise, determine based on amount
-        feeType.value = fee.amount > 0 ? 'simple' : 'complex'
-      }
-      
-      feeTypeSelected.value = true
-    }
-  }
-})
-
 onUnmounted(() => {
   // Reset all reactive state
   form.value = {

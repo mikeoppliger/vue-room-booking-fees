@@ -29,6 +29,15 @@
             >
               Neue Gebühr
             </v-btn>
+            <v-btn
+              class="ml-2"
+              color="error"
+              variant="tonal"
+              prepend-icon="mdi-delete-sweep"
+              @click="confirmClearAll"
+            >
+              Alle löschen
+            </v-btn>
           </v-toolbar>
 
           <v-data-table
@@ -128,6 +137,33 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    
+    <!-- Clear All Confirmation Dialog -->
+    <v-dialog v-model="showClearAllDialog" max-width="400">
+      <v-card>
+        <v-card-title class="text-h5">Alle Gebühren löschen</v-card-title>
+        <v-card-text>
+          Sind Sie sicher, dass Sie alle Gebühren löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="grey-darken-1"
+            variant="text"
+            @click="showClearAllDialog = false"
+          >
+            Abbrechen
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="text"
+            @click="clearAllFees"
+          >
+            Alle löschen
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Notifications -->
     <v-snackbar
@@ -175,6 +211,7 @@ const feeStore = useFeeStore()
 const discountStore = useDiscountStore()
 const search = ref('')
 const showDeleteDialog = ref(false)
+const showClearAllDialog = ref(false)
 const showSuccessAlert = ref(false)
 const successMessage = ref('')
 const showErrorAlert = ref(false)
@@ -222,9 +259,30 @@ function confirmDelete(fee) {
 
 function deleteFee() {
   if (selectedFeeId.value) {
-    feeStore.deleteFee(selectedFeeId.value)
-    showDeleteDialog.value = false
-    selectedFeeId.value = null
+    try {
+      console.log('Attempting to delete fee with ID:', selectedFeeId.value)
+      const result = feeStore.deleteFee(selectedFeeId.value)
+      
+      if (result) {
+        // Success
+        successMessage.value = 'Gebühr wurde erfolgreich gelöscht'
+        showSuccessAlert.value = true
+        console.log('Fee deleted successfully')
+      } else {
+        // Failed to delete
+        errorMessage.value = 'Fehler beim Löschen der Gebühr'
+        showErrorAlert.value = true
+        console.error('Failed to delete fee, result was:', result)
+      }
+      
+      showDeleteDialog.value = false
+      selectedFeeId.value = null
+    } catch (error) {
+      console.error('Error deleting fee:', error)
+      errorMessage.value = `Fehler beim Löschen: ${error.message || 'Unbekannter Fehler'}`
+      showErrorAlert.value = true
+      showDeleteDialog.value = false
+    }
   }
 }
 
@@ -262,6 +320,22 @@ function isFeeCurrent(fee) {
   const endDate = fee.endDate ? new Date(fee.endDate) : null
   
   return (!startDate || startDate <= now) && (!endDate || endDate >= now)
+}
+
+function confirmClearAll() {
+  showClearAllDialog.value = true
+}
+
+function clearAllFees() {
+  // Clear all fees from the store
+  feeStore.clearAllFees()
+  
+  // Close the dialog
+  showClearAllDialog.value = false
+  
+  // Show success message
+  successMessage.value = 'Alle Gebühren wurden erfolgreich gelöscht'
+  showSuccessAlert.value = true
 }
 </script>
 
