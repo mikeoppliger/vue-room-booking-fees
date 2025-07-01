@@ -97,6 +97,7 @@
                   </v-card-item>
                   <v-card-text class="pt-0">
                     <fee-calculator
+                      ref="feeCalculator"
                       :fee="form"
                       :discounts="feeDiscounts"
                       class="fee-calculator"
@@ -884,13 +885,29 @@ const addSelectedDiscount = () => {
 
 const isCalculatorActive = ref(false)
 const calculatedFinalAmount = ref(0)
+const originalAmount = ref(0)
 
+// Store the original amount when calculator is activated
 const handleCalculatorInput = () => {
+  console.log('Calculator input event received in FeeEdit')
+  if (!isCalculatorActive.value) {
+    // Store the original amount when first activating calculator
+    originalAmount.value = form.value.amount || 0
+  }
   isCalculatorActive.value = true
 }
 
 const handleCalculatorEmpty = () => {
+  console.log('Calculator empty event received in FeeEdit')
   isCalculatorActive.value = false
+  
+  // Restore the original amount if we had one
+  if (originalAmount.value > 0) {
+    form.value.amount = originalAmount.value
+  }
+  
+  // Reset the calculated amount
+  calculatedFinalAmount.value = 0
 }
 
 const handleFinalResultChange = (finalResult) => {

@@ -1,29 +1,5 @@
 <template>
   <div class="fee-calculator-container">
-    <!-- Position Name Field -->
-    <v-sheet class="position-field mb-6 pt-4 pb-4" rounded="lg" elevation="0" >
-      <div class="d-flex align-center mb-2">
-        <v-icon color="primary" size="small" class="mr-2">mdi-tag-text</v-icon>
-        <div class="text-subtitle-1 font-weight-medium">Positionsname</div>
-        <v-tooltip location="top">
-          <template v-slot:activator="{ props }">
-            <v-icon v-bind="props" size="x-small" color="grey-darken-1" class="ml-2">mdi-information-outline</v-icon>
-          </template>
-          <span>Name der Gebührenposition</span>
-        </v-tooltip>
-      </div>
-      <v-text-field
-        v-model="positionName"
-        density="comfortable"
-        variant="outlined"
-        hide-details
-        placeholder="Original Berechnung"
-        bg-color="white"
-        :append-inner-icon="positionName ? 'mdi-check-circle' : ''"
-        :append-inner-icon-color="'success'"
-      ></v-text-field>
-    </v-sheet>
-
     <!-- Calculation Steps -->
     <v-sheet class="calculation-container mb-6" rounded="lg" elevation="0" >
       <div class="pt-4 pb-4">
@@ -38,98 +14,10 @@
           </v-tooltip>
         </div>
         
-        <!-- First Calculation Step -->
-        <div class="calculation-row mb-4">
-          <div class="input-field">
-            <div class="d-flex align-center mb-1">
-              <v-tooltip location="top">
-                <template v-slot:activator="{ props }">
-                  <v-icon v-bind="props" size="x-small" color="primary" class="mr-1">mdi-pencil</v-icon>
-                </template>
-                <span>Feldname bearbeiten</span>
-              </v-tooltip>
-              <v-text-field
-                v-model="calculationSteps[0].label1"
-                density="compact"
-                variant="plain"
-                placeholder="Personen"
-                hide-details
-                class="label-input"
-              ></v-text-field>
-            </div>
-            <v-text-field
-              v-model="calculationSteps[0].value1"
-              type="number"
-              density="comfortable"
-              variant="outlined"
-              hide-details
-              min="0"
-              placeholder="0"
-              bg-color="white"
-              @input="calculateResults"
-              :append-inner-icon="calculationSteps[0].value1 ? 'mdi-check-circle' : ''"
-              :append-inner-icon-color="'success'"
-            ></v-text-field>
-          </div>
-
-          <div class="operator-container">
-            <v-select
-              v-model="calculationSteps[0].operator"
-              :items="operators"
-              variant="plain"
-              density="comfortable"
-              hide-details
-              class="operator-select"
-              @update:model-value="calculateResults"
-            ></v-select>
-          </div>
-
-          <div class="input-field">
-            <div class="d-flex align-center mb-1">
-              <v-tooltip location="top">
-                <template v-slot:activator="{ props }">
-                  <v-icon v-bind="props" size="x-small" color="primary" class="mr-1">mdi-pencil</v-icon>
-                </template>
-                <span>Feldname bearbeiten</span>
-              </v-tooltip>
-              <v-text-field
-                v-model="calculationSteps[0].label2"
-                density="compact"
-                variant="plain"
-                placeholder="Nächte"
-                hide-details
-                class="label-input"
-              ></v-text-field>
-            </div>
-            <v-text-field
-              v-model="calculationSteps[0].value2"
-              type="number"
-              density="comfortable"
-              variant="outlined"
-              hide-details
-              min="0"
-              placeholder="0"
-              bg-color="white"
-              @input="calculateResults"
-              :append-inner-icon="calculationSteps[0].value2 ? 'mdi-check-circle' : ''"
-              :append-inner-icon-color="'success'"
-            ></v-text-field>
-          </div>
-
-          <div class="equals d-flex align-center justify-center">=</div>
-
-          <div class="result-container">
-            <v-sheet color="amber-lighten-5" class="result pa-2 rounded" border>
-              <div class="text-h6 text-amber-darken-3 text-right">{{ calculationSteps[0].result }}</div>
-            </v-sheet>
-            <div class="result-label text-center text-caption mt-1">Zwischenergebnis</div>
-          </div>
-        </div>
-        
-        <!-- Additional Calculation Steps -->
-        <div v-for="(step, index) in calculationSteps.slice(1)" :key="index + 1" class="calculation-row mb-4">
-          <div class="step-indicator d-flex align-center justify-center">
-            <v-chip color="primary" size="small" class="mr-2">Schritt {{ index + 2 }}</v-chip>
+        <!-- Calculation Steps -->
+        <div class="calculation-row mb-4" v-for="(step, index) in calculationSteps" :key="index">
+          <div class="step-indicator text-caption text-grey-darken-1">
+            Schritt {{ index + 1 }}
           </div>
           
           <div class="input-field">
@@ -144,30 +32,34 @@
                 v-model="step.label1"
                 density="compact"
                 variant="plain"
-                placeholder="Vorheriges Ergebnis"
+                placeholder="Wert 1"
                 hide-details
                 class="label-input"
-                disabled
               ></v-text-field>
             </div>
             <v-text-field
-              :value="calculationSteps[index].result"
+              v-model="step.value1"
               type="number"
               density="comfortable"
               variant="outlined"
               hide-details
-              bg-color="grey-lighten-4"
-              readonly
-              class="previous-result"
+              min="0"
+              placeholder="0"
+              bg-color="white"
+              @input="calculateResults"
+              :append-inner-icon="step.value1 ? 'mdi-check-circle' : ''"
+              :append-inner-icon-color="'success'"
             ></v-text-field>
           </div>
 
-          <div class="operator-container">
+          <div class="operator d-flex align-center justify-center">
             <v-select
               v-model="step.operator"
               :items="operators"
+              item-title="title"
+              item-value="value"
               variant="plain"
-              density="comfortable"
+              density="compact"
               hide-details
               class="operator-select"
               @update:model-value="calculateResults"
@@ -186,7 +78,7 @@
                 v-model="step.label2"
                 density="compact"
                 variant="plain"
-                placeholder="Wert"
+                placeholder="Wert 2"
                 hide-details
                 class="label-input"
               ></v-text-field>
@@ -213,17 +105,17 @@
               <div class="text-h6 text-amber-darken-3 text-right">{{ step.result }}</div>
             </v-sheet>
             <div class="result-label text-center text-caption mt-1">
-              {{ index === calculationSteps.length - 2 ? 'Endergebnis' : 'Zwischenergebnis' }}
+              {{ index === calculationSteps.length - 1 ? 'Endergebnis' : 'Zwischenergebnis' }}
             </div>
           </div>
           
           <div class="remove-step-container">
             <v-btn
               icon="mdi-delete"
-              variant="tonal"
+              variant="elevated"
               color="error"
               size="small"
-              @click="removeStep(index + 1)"
+              @click="removeStep(index)"
               class="remove-step-btn"
             >
               <v-tooltip activator="parent" location="top">
@@ -256,7 +148,6 @@ export default {
   name: 'FeeCalculator',
   data() {
     return {
-      positionName: 'Original Berechnung',
       operators: [
         {title: '×', value: '*'}, 
         {title: '+', value: '+'}, 
@@ -265,8 +156,8 @@ export default {
       ],
       calculationSteps: [
         {
-          label1: 'Personen',
-          label2: 'Nächte',
+          label1: '',
+          label2: '',
           value1: '',
           value2: '',
           operator: '*',
@@ -277,8 +168,7 @@ export default {
   },
   computed: {
     isFormValid() {
-      return this.positionName.trim() !== '' && 
-             this.calculationSteps.some(step => 
+      return this.calculationSteps.some(step => 
                (step.value1 !== '' || step === this.calculationSteps[0]) && 
                step.value2 !== ''
              )
@@ -303,6 +193,9 @@ export default {
         firstInput.focus()
       }
     })
+    
+    // Initial check if calculator is empty
+    this.$emit('calculator-empty')
   },
   methods: {
     calculateResults() {
@@ -326,14 +219,55 @@ export default {
         }
       }
       
-      // Emit an event when calculator values are entered
-      this.$emit('calculator-input')
+      // Check if all calculator fields are empty
+      const isCalculatorEmpty = this.isCalculatorEmpty()
+      
+      // Emit appropriate event based on calculator state
+      if (isCalculatorEmpty) {
+        console.log('Calculator is empty, emitting calculator-empty event')
+        this.$emit('calculator-empty')
+      } else {
+        console.log('Calculator has values, emitting calculator-input event')
+        this.$emit('calculator-input')
+      }
       
       // Emit the final result to the parent component
       if (this.calculationSteps.length > 0) {
         const finalResult = this.calculationSteps[this.calculationSteps.length - 1].result
         this.$emit('final-result-change', finalResult)
       }
+    },
+    
+    isCalculatorEmpty() {
+      // Check if all value fields in all steps are empty or zero
+      if (this.calculationSteps.length === 0) return true
+      
+      // For the first step, check if both input fields are empty or zero
+      const firstStep = this.calculationSteps[0]
+      
+      // Check if first step has any non-zero values
+      const firstValue = parseFloat(firstStep.value1) || 0
+      const secondValue = parseFloat(firstStep.value2) || 0
+      
+      if (firstValue > 0 && secondValue > 0) {
+        return false // Not empty if both values are present and greater than zero
+      }
+      
+      // If there's only one step with empty or zero values, consider it empty
+      if (this.calculationSteps.length === 1) {
+        return true
+      }
+      
+      // For additional steps, check if any have non-zero second values
+      for (let i = 1; i < this.calculationSteps.length; i++) {
+        const stepValue = parseFloat(this.calculationSteps[i].value2) || 0
+        if (stepValue > 0) {
+          return false // Not empty if any subsequent step has a value
+        }
+      }
+      
+      // If we get here, all values are empty or zero
+      return true
     },
     
     performCalculation(value1, value2, operator) {
@@ -351,33 +285,46 @@ export default {
       }
     },
     
-    addCalculationStep() {
-      if (!this.canAddStep) return
-      
-      this.calculationSteps.push({
-        label1: 'Vorheriges Ergebnis',
-        label2: 'Wert',
-        value1: '', // This will be the previous result
+    createEmptyStep() {
+      return {
+        label1: '',
+        label2: '',
+        value1: '',
         value2: '',
         operator: '*',
         result: '0.00'
-      })
-      
-      // Recalculate all results
-      this.$nextTick(() => {
-        this.calculateResults()
-      })
+      }
+    },
+    
+    addCalculationStep() {
+      this.calculationSteps.push(this.createEmptyStep())
+      this.calculateResults()
     },
     
     removeStep(index) {
-      if (index < 1 || index >= this.calculationSteps.length) return
-      
-      this.calculationSteps.splice(index, 1)
-      
-      // Recalculate all results after removing a step
-      this.$nextTick(() => {
+      if (this.calculationSteps.length > 1) {
+        // Remove the step at the specified index
+        this.calculationSteps.splice(index, 1)
+        
+        // Recalculate all results
         this.calculateResults()
-      })
+      } else {
+        // If it's the last step, just clear its values instead of removing it
+        const step = this.calculationSteps[0]
+        step.label1 = ''
+        step.label2 = ''
+        step.value1 = ''
+        step.value2 = ''
+        step.result = '0.00'
+        
+        // Emit calculator-empty event since we've cleared all values
+        this.$emit('calculator-empty')
+      }
+      
+      // If all steps were removed, add an empty one
+      if (this.calculationSteps.length === 0) {
+        this.calculationSteps.push(this.createEmptyStep())
+      }
     }
   }
 }
@@ -411,7 +358,7 @@ export default {
   min-height: 24px;
 }
 
-.operator-container {
+.operator {
   width: 60px;
   display: flex;
   align-items: center;
@@ -449,12 +396,26 @@ export default {
 
 .remove-step-container {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
 }
 
 .remove-step-btn {
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 3px 5px rgba(0,0,0,0.2);
+  opacity: 0.9;
+  transition: all 0.2s ease;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.remove-step-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.fee-calculator-container:hover {
+  box-shadow: none !important;
 }
 
 @media (max-width: 600px) {
@@ -463,7 +424,7 @@ export default {
     align-items: stretch;
   }
   
-  .operator-container, .equals {
+  .operator, .equals {
     align-self: center;
     margin: 8px 0;
   }
